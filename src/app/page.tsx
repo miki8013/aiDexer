@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // Maximum length of the user's search query. Kept aligned with the server-side
 // limit in api/recommend/route.ts so we never send a huge blob of text.
@@ -560,21 +560,30 @@ function getSuggestions(category: string): AIModel[] {
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [recommendations, setRecommendations] = useState<AIModel[]>([]);
+  const [useAi, setUseAi] = useState(false); // OFF = free instant engine, ON = Gemini AI
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [isLoading, setIsLoading] = useState(false);
   const [displayCount, setDisplayCount] = useState(4);
   const [hasSearched, setHasSearched] = useState(false);
   const [staticSuggestions, setStaticSuggestions] = useState<AIModel[]>(getSuggestions("All"));
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [resultSource, setResultSource] = useState<"gemini" | "keyword" | null>(null);
+
+  // Refs for stale-request discarding
+  const latestRequestRef = useRef(0);
 
   const categories = ["All", ...Array.from(new Set(aiDatabase.map(ai => ai.category)))];
 
   const getRecommendations = async (query: string) => {
     if (!query.trim()) return [];
-    
+
     // Defensive guard: limit the amount of text sent to the API
     const limitedQuery = query.trim().slice(0, MAX_QUERY_LENGTH);
     if (!limitedQuery) return [];
-    
+
+    // Track request order so a slow earlier request never overwrites newer results
+    const requestId = ++latestRequestRef.current;
+
     try {
       const response = await fetch('/api/recommend', {
         method: 'POST',
@@ -584,40 +593,61 @@ export default function Home() {
         body: JSON.stringify({
           query: limitedQuery,
           category: selectedCategory === 'All' ? undefined : selectedCategory,
+          useAi,
         }),
       });
 
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        if (requestId !== latestRequestRef.current) return null; // stale, discard
+        setSearchError(
+          response.status === 429
+            ? 'You are searching too fast — please wait a moment and try again.'
+            : errData?.error || `Search failed (${response.status}).`
+        );
+        return [];
+      }
+
       const data = await response.json();
+      if (requestId !== latestRequestRef.current) return null; // stale, discard
+      setSearchError(null);
+      setResultSource(data.source === 'gemini' ? 'gemini' : data.source === 'keyword' ? 'keyword' : null);
       return data.recommendations || [];
     } catch (error) {
       console.error('Error getting recommendations:', error);
+      if (requestId !== latestRequestRef.current) return null; // stale, discard
       // Fallback to basic matching
       const lowerQuery = limitedQuery.toLowerCase();
-      
+
       return aiDatabase.filter(ai => {
         const matchesCategory = selectedCategory === "All" || ai.category === selectedCategory;
-        const matchesSearch = 
+        const matchesSearch =
           ai.name.toLowerCase().includes(lowerQuery) ||
           ai.description.toLowerCase().includes(lowerQuery) ||
           ai.strengths.some(s => s.toLowerCase().includes(lowerQuery)) ||
           ai.bestFor.some(b => b.toLowerCase().includes(lowerQuery)) ||
           ai.category.toLowerCase().includes(lowerQuery);
-        
+
         return matchesCategory && matchesSearch;
       });
     }
   };
 
+  const runSearch = async (query: string) => {
+    if (!query.trim()) return;
+    setIsLoading(true);
+    setDisplayCount(4);
+    setSelectedCategory("All");
+    setHasSearched(true);
+    const results = await getRecommendations(query);
+    // null = a newer request superseded this one
+    if (results !== null) setRecommendations(results);
+    setIsLoading(false);
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setDisplayCount(4); // Reset display count
-    // Typing a search should search across ALL tools, so clear the focused category
-    setSelectedCategory("All");
-    setHasSearched(true); // Mark that user has searched
-    const results = await getRecommendations(searchQuery);
-    setRecommendations(results);
-    setIsLoading(false);
+    await runSearch(searchQuery);
   };
 
   // Trigger AI search when category is clicked
@@ -694,6 +724,29 @@ export default function Home() {
 
         {/* Search Section */}
         <div className="mb-16">
+          {/* Use AI Toggle */}
+          <div className="flex items-center justify-end mb-4">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <span className="text-sm text-neutral-600">
+                AI Mode
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useAi}
+                onClick={() => setUseAi((prev) => !prev)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  useAi ? 'bg-neutral-900' : 'bg-neutral-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    useAi ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </label>
+          </div>
           <form onSubmit={handleSearch} className="space-y-6">
             <div>
               <input
@@ -746,19 +799,32 @@ export default function Home() {
               disabled={isLoading}
               className="px-8 py-3 bg-neutral-900 text-white font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Searching...' : 'Search'}
+              {isLoading
+                ? useAi ? 'Asking AI...' : 'Searching...'
+                : 'Search'}
             </button>
           </form>
         </div>
 
         {/* Results Section */}
         {hasSearched ? (
-          // AI Results (after user search)
-          recommendations.length > 0 && (
+          searchError ? (
+            <div className="mb-16 border border-red-200 bg-red-50 p-6 text-red-700">
+              <p className="font-medium mb-1">Search problem</p>
+              <p className="text-sm">{searchError}</p>
+            </div>
+          ) : recommendations.length > 0 ? (
             <div className="mb-16">
-              <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-6">
-                {recommendations.length} result{recommendations.length !== 1 ? 's' : ''} found
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider">
+                  {recommendations.length} result{recommendations.length !== 1 ? 's' : ''} found
+                </h2>
+                {resultSource === 'gemini' && (
+                  <span className="text-xs text-neutral-400">
+                    AI picks
+                  </span>
+                )}
+              </div>
               <div className="space-y-4">
                 {recommendations.slice(0, displayCount).map((ai, index) => (
                   <div
@@ -826,6 +892,16 @@ export default function Home() {
                 </div>
               )}
             </div>
+          ) : (
+            // Empty state: searched but nothing matched
+            !isLoading && (
+              <div className="mb-16 text-center py-12 border border-neutral-200">
+                <p className="text-lg font-medium text-neutral-900 mb-2">No matches found</p>
+                <p className="text-sm text-neutral-500">
+                  Try describing what you want to do differently — e.g. &quot;edit videos for YouTube&quot; or &quot;write emails faster&quot;.
+                </p>
+              </div>
+            )
           )
         ) : (
           // Static Suggestions (before user search)

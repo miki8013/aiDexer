@@ -730,7 +730,12 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
         {/* Header */}
         <header className="mb-10 sm:mb-16">
-          <h1 className="text-4xl sm:text-5xl font-black text-neutral-900 dark:text-neutral-50 mb-2 sm:mb-4 tracking-tight">
+          <h1 className="flex items-center gap-2.5 text-4xl sm:text-5xl font-black text-neutral-900 dark:text-neutral-50 mb-2 sm:mb-4 tracking-tight">
+            <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true" className="w-8 h-8 sm:w-9 sm:h-9 shrink-0">
+              <rect x="1.5" y="1.5" width="29" height="29" rx="8" className="fill-neutral-900 dark:fill-neutral-50" />
+              <circle cx="14.5" cy="14.5" r="6" stroke="none" className="fill-neutral-50 dark:fill-neutral-900" />
+              <path d="M19 19L24 24" className="stroke-neutral-50 dark:stroke-neutral-900" strokeWidth="3" strokeLinecap="round" />
+            </svg>
             aiDexer
           </h1>
           <p className="text-lg sm:text-xl text-neutral-600 dark:text-neutral-400 max-w-xl">

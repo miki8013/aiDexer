@@ -568,6 +568,22 @@ export default function Home() {
   const [staticSuggestions, setStaticSuggestions] = useState<AIModel[]>(getSuggestions("All"));
   const [searchError, setSearchError] = useState<string | null>(null);
   const [resultSource, setResultSource] = useState<"gemini" | "keyword" | null>(null);
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Restore saved theme on mount; if the user never chose, follow their OS
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark') setDarkMode(true);
+    else if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setDarkMode(true);
+    }
+  }, []);
+
+  // Apply theme class and persist
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   // Refs for stale-request discarding
   const latestRequestRef = useRef(0);
@@ -701,7 +717,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-white dark:bg-neutral-950 transition-colors">
       {/* Subtle light-blue ambient glows - only in the top corners, fading away */}
       <div
         aria-hidden="true"
@@ -711,23 +727,42 @@ export default function Home() {
             "radial-gradient(700px circle at 12% -5%, rgba(147,197,253,0.14), transparent 60%), radial-gradient(600px circle at 88% -8%, rgba(147,197,253,0.12), transparent 55%)",
         }}
       />
-      <div className="max-w-4xl mx-auto px-6 py-16">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
         {/* Header */}
-        <header className="mb-16">
-          <h1 className="text-5xl font-black text-neutral-900 mb-4 tracking-tight">
+        <header className="mb-10 sm:mb-16">
+          <h1 className="text-4xl sm:text-5xl font-black text-neutral-900 dark:text-neutral-50 mb-2 sm:mb-4 tracking-tight">
             aiDexer
           </h1>
-          <p className="text-xl text-neutral-600 max-w-xl">
+          <p className="text-lg sm:text-xl text-neutral-600 dark:text-neutral-400 max-w-xl">
             Find the right AI tool for what you're trying to do
           </p>
         </header>
 
         {/* Search Section */}
-        <div className="mb-16">
-          {/* Use AI Toggle */}
-          <div className="flex items-center justify-end mb-4">
+        <div className="mb-10 sm:mb-16">
+          {/* Toggles: AI mode + dark mode */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              type="button"
+              aria-label="Toggle dark mode"
+              onClick={() => setDarkMode((prev) => !prev)}
+              className="p-1.5 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            >
+              {darkMode ? (
+                // Sun icon
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                </svg>
+              ) : (
+                // Moon icon
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
+            </button>
             <label className="flex items-center gap-3 cursor-pointer select-none">
-              <span className="text-sm text-neutral-600">
+              <span className="text-sm text-neutral-600 dark:text-neutral-400">
                 AI Mode
               </span>
               <button
@@ -736,12 +771,14 @@ export default function Home() {
                 aria-checked={useAi}
                 onClick={() => setUseAi((prev) => !prev)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  useAi ? 'bg-neutral-900' : 'bg-neutral-300'
+                  useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    useAi ? 'translate-x-6' : 'translate-x-1'
+                  className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+                    useAi
+                      ? 'translate-x-6 bg-white dark:bg-neutral-900'
+                      : 'translate-x-1 bg-white'
                   }`}
                 />
               </button>
@@ -755,7 +792,7 @@ export default function Home() {
                 onChange={(e) => setSearchQuery(e.target.value.slice(0, MAX_QUERY_LENGTH))}
                 placeholder="What do you want to do? (e.g., write code, create images)"
                 maxLength={MAX_QUERY_LENGTH}
-                className="w-full px-0 py-4 text-2xl font-medium text-neutral-900 placeholder-neutral-400 border-0 border-b-2 border-neutral-200 focus:border-neutral-900 focus:ring-0 bg-transparent transition-colors"
+                className="w-full px-0 py-3 sm:py-4 text-lg sm:text-2xl font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 border-0 border-b-2 border-neutral-200 dark:border-neutral-700 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 bg-transparent transition-colors"
               />
               <div className="mt-2 flex items-center justify-between text-xs">
                 <span className="text-neutral-400">
@@ -783,10 +820,10 @@ export default function Home() {
                       handleCategoryFilter(category);
                     }
                   }}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium transition-colors ${
                     selectedCategory === category
                       ? "bg-neutral-900 text-white"
-                      : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                      : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                   }`}
                 >
                   {category}
@@ -797,7 +834,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={isLoading}
-              className="px-8 py-3 bg-neutral-900 text-white font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-8 py-3 bg-neutral-900 text-white font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading
                 ? useAi ? 'Asking AI...' : 'Searching...'
@@ -809,14 +846,14 @@ export default function Home() {
         {/* Results Section */}
         {hasSearched ? (
           searchError ? (
-            <div className="mb-16 border border-red-200 bg-red-50 p-6 text-red-700">
+            <div className="mb-10 sm:mb-16 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-4 sm:p-6 text-red-700 dark:text-red-300">
               <p className="font-medium mb-1">Search problem</p>
               <p className="text-sm">{searchError}</p>
             </div>
           ) : recommendations.length > 0 ? (
-            <div className="mb-16">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider">
+            <div className="mb-10 sm:mb-16">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-6">
+                <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                   {recommendations.length} result{recommendations.length !== 1 ? 's' : ''} found
                 </h2>
                 {resultSource === 'gemini' && (
@@ -829,48 +866,48 @@ export default function Home() {
                 {recommendations.slice(0, displayCount).map((ai, index) => (
                   <div
                     key={index}
-                    className="border border-neutral-200 p-6 hover:border-neutral-400 transition-colors"
+                    className="border border-neutral-200 p-4 sm:p-6 hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600 transition-colors"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-xl font-semibold text-neutral-900">
+                    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3">
+                      <h3 className="text-lg sm:text-xl font-semibold text-neutral-900 dark:text-neutral-100">
                         {ai.name}
                       </h3>
-                      <span className="text-sm text-neutral-500">
+                      <span className="text-xs sm:text-sm text-neutral-500">
                         {ai.category}
                       </span>
                     </div>
-                    
-                    <p className="text-neutral-600 mb-4">
+
+                    <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400 mb-4">
                       {ai.description}
                     </p>
 
                     <div className="space-y-3">
                       <div>
-                        <span className="text-xs font-semibold text-neutral-500 uppercase">Best for:</span>
+                        <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase">Best for:</span>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {ai.bestFor.map((item, i) => (
-                            <span key={i} className="text-sm text-neutral-700">
+                            <span key={i} className="text-sm text-neutral-700 dark:text-neutral-300">
                               {item}{i !== ai.bestFor.length - 1 && ','}
                             </span>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex gap-8 text-sm">
+                      <div className="flex flex-col gap-1 text-sm sm:flex-row sm:gap-8">
                         <div>
                           <span className="text-neutral-500">Pricing:</span>{' '}
-                          <span className="text-neutral-900">{ai.pricing}</span>
+                          <span className="text-neutral-900 dark:text-neutral-100">{ai.pricing}</span>
                         </div>
                         <div>
                           <span className="text-neutral-500">Access:</span>{' '}
-                          <span className="text-neutral-900">{ai.access}</span>
+                          <span className="text-neutral-900 dark:text-neutral-100">{ai.access}</span>
                         </div>
                       </div>
-<a
+                      <a
                         href={ai.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 w-full px-5 py-2.5 text-sm font-semibold text-white bg-neutral-900 dark:bg-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors sm:w-auto sm:py-2"
                       >
                         Visit {ai.name} →
                       </a>
@@ -885,7 +922,7 @@ export default function Home() {
                   <button
                     onClick={handleLoadMore}
                     disabled={isLoading}
-                    className="px-8 py-3 bg-neutral-100 text-neutral-900 font-medium hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto px-8 py-3 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Load More
                   </button>
@@ -895,9 +932,9 @@ export default function Home() {
           ) : (
             // Empty state: searched but nothing matched
             !isLoading && (
-              <div className="mb-16 text-center py-12 border border-neutral-200">
-                <p className="text-lg font-medium text-neutral-900 mb-2">No matches found</p>
-                <p className="text-sm text-neutral-500">
+              <div className="mb-10 sm:mb-16 text-center py-8 sm:py-12 border border-neutral-200 dark:border-neutral-800">
+                <p className="text-base sm:text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">No matches found</p>
+                <p className="text-sm text-neutral-500 px-4">
                   Try describing what you want to do differently — e.g. &quot;edit videos for YouTube&quot; or &quot;write emails faster&quot;.
                 </p>
               </div>
@@ -906,56 +943,56 @@ export default function Home() {
         ) : (
           // Static Suggestions (before user search)
           staticSuggestions.length > 0 && (
-            <div className="mb-16">
-              <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-6">
+            <div className="mb-10 sm:mb-16">
+              <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-6">
                 {selectedCategory === "All" ? "Popular AI Tools" : `Popular ${selectedCategory} Tools`}
               </h2>
               <div className="space-y-4">
                 {staticSuggestions.slice(0, displayCount).map((ai, index) => (
                   <div
                     key={index}
-                    className="border border-neutral-200 p-6 hover:border-neutral-400 transition-colors"
+                    className="border border-neutral-200 p-4 sm:p-6 hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600 transition-colors"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-xl font-semibold text-neutral-900">
+                    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3">
+                      <h3 className="text-lg sm:text-xl font-semibold text-neutral-900 dark:text-neutral-100">
                         {ai.name}
                       </h3>
-                      <span className="text-sm text-neutral-500">
+                      <span className="text-xs sm:text-sm text-neutral-500">
                         {ai.category}
                       </span>
                     </div>
-                    
-                    <p className="text-neutral-600 mb-4">
+
+                    <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400 mb-4">
                       {ai.description}
                     </p>
 
                     <div className="space-y-3">
                       <div>
-                        <span className="text-xs font-semibold text-neutral-500 uppercase">Best for:</span>
+                        <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase">Best for:</span>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {ai.bestFor.map((item, i) => (
-                            <span key={i} className="text-sm text-neutral-700">
+                            <span key={i} className="text-sm text-neutral-700 dark:text-neutral-300">
                               {item}{i !== ai.bestFor.length - 1 && ','}
                             </span>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex gap-8 text-sm">
+                      <div className="flex flex-col gap-1 text-sm sm:flex-row sm:gap-8">
                         <div>
                           <span className="text-neutral-500">Pricing:</span>{' '}
-                          <span className="text-neutral-900">{ai.pricing}</span>
+                          <span className="text-neutral-900 dark:text-neutral-100">{ai.pricing}</span>
                         </div>
                         <div>
                           <span className="text-neutral-500">Access:</span>{' '}
-                          <span className="text-neutral-900">{ai.access}</span>
+                          <span className="text-neutral-900 dark:text-neutral-100">{ai.access}</span>
                         </div>
                       </div>
-<a
+                      <a
                         href={ai.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 w-full px-5 py-2.5 text-sm font-semibold text-white bg-neutral-900 dark:bg-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors sm:w-auto sm:py-2"
                       >
                         Visit {ai.name} →
                       </a>
@@ -970,7 +1007,7 @@ export default function Home() {
                   <button
                     onClick={handleLoadMorePopular}
                     disabled={isLoading}
-                    className="px-8 py-3 bg-neutral-100 text-neutral-900 font-medium hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto px-8 py-3 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoading ? 'Loading...' : 'Load More'}
                   </button>

@@ -778,6 +778,77 @@ async function callGroqWithRetry(
   }
 }
 
+// --- Gemini fallback provider ---
+// Calls Google's Gemini REST API directly (no extra dependency). Used as a
+// fallback when Groq is rate-limited or errors out.
+const GEMINI_MODEL = 'gemini-1.5-flash';
+
+async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+  const key = process.env.GEMINI_API_KEY || '';
+  if (!key) {
+    throw new Error('No GEMINI_API_KEY configured');
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.5, maxOutputTokens: 150 },
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Gemini request failed (${res.status}): ${errBody}`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts
+    ?.map((p: any) => p.text || '')
+    .join('');
+
+  if (!text) {
+    throw new Error('Gemini returned an empty response');
+  }
+  return text;
+}
+
+// Tries Groq first, then falls back to Gemini when Groq fails (rate limit, etc.)
+async function getProviderResponse(systemPrompt: string, userPrompt: string): Promise<string> {
+  const availableModels = await getAvailableChatModels();
+  const selectedModel = selectBestModel(availableModels);
+
+  console.log(`Using model: ${selectedModel} (available: ${availableModels.length} models)`);
+
+  try {
+    // Attempt 1: Groq (with retry-on-429 backoff)
+    const chatCompletion = await callGroqWithRetry({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      model: selectedModel,
+      temperature: 0.5,
+      max_tokens: 150,
+      // Don't force JSON format as it causes issues with some models
+    });
+    return chatCompletion.choices[0]?.message?.content || '[]';
+  } catch (groqError) {
+    // Attempt 2: Fall back to Gemini
+    console.warn('Groq failed, falling back to Gemini:', (groqError as any)?.message || groqError);
+    try {
+      return await callGemini(systemPrompt, userPrompt);
+    } catch (geminiError) {
+      console.error('Gemini fallback also failed:', geminiError);
+      throw groqError; // Report the original Groq error
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Security Check 1: Request size limit
@@ -845,29 +916,9 @@ Return ONLY the JSON object, nothing else.`;
 
 Return a JSON object with a "recommendations" key containing the indices of the most relevant AI tools for this query.`;
 
-    // Dynamically select the best available model
-    const availableModels = await getAvailableChatModels();
-    const selectedModel = selectBestModel(availableModels);
-    
-    console.log(`Using model: ${selectedModel} (available: ${availableModels.length} models)`);
+    // Call Groq (with Gemini fallback on failure/rate-limit)
+    const response = await getProviderResponse(systemPrompt, userPrompt);
 
-    // Adjust max_tokens based on model (smaller models may have limits)
-    // The response is just indices, so a small limit is plenty and saves TPM.
-    const maxTokens = 150;
-
-    const chatCompletion = await callGroqWithRetry({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      model: selectedModel,
-      temperature: 0.5,
-      max_tokens: maxTokens,
-      // Don't force JSON format as it causes issues with some models
-    });
-
-    const response = chatCompletion.choices[0]?.message?.content || '[]';
-    
     // Parse the response - handle both JSON objects and direct arrays
     let recommendedIndices: number[] = [];
     

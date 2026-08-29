@@ -752,6 +752,32 @@ const aiDatabase: AIModel[] = [
   }
 ];
 
+type ChatCompletion = Groq.Chat.Completions.ChatCompletion;
+
+async function callGroqWithRetry(
+  params: Parameters<typeof groq.chat.completions.create>[0],
+  maxRetries: number = 2
+): Promise<ChatCompletion> {
+  let attempts = 0;
+  while (true) {
+    try {
+      return await groq.chat.completions.create(params) as ChatCompletion;
+    } catch (err: any) {
+      // On 429 (rate limit), wait for the retry-after window and try again.
+      // This avoids failing the request when Groq is temporarily over TPM/TPR.
+      if (err?.status === 429 && attempts < maxRetries) {
+        attempts++;
+        const retryAfter = err?.headers?.get?.('retry-after');
+        const waitMs = (retryAfter && Number(retryAfter)) ? Number(retryAfter) * 1000 : 20000;
+        console.log(`Groq rate limited. Retrying in ${waitMs}ms (attempt ${attempts}/${maxRetries})`);
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Security Check 1: Request size limit
@@ -792,9 +818,10 @@ export async function POST(request: NextRequest) {
 
     const { query, category } = validation.sanitized!;
 
-    // Create a formatted database string for the AI
-    const databaseString = aiDatabase.map((ai, index) => 
-      `${index + 1}. ${ai.name} (${ai.category}): ${ai.description} Best for: ${ai.bestFor.join(', ')}. Strengths: ${ai.strengths.join(', ')}. Pricing: ${ai.pricing}. Access: ${ai.access}`
+    // Create a formatted database string for the AI (kept compact to stay within
+    // free-tier token limits and avoid burning TPM on every request)
+    const databaseString = aiDatabase.map((ai, index) =>
+      `${index + 1}. ${ai.name} (${ai.category}, ${ai.pricing}, ${ai.access}): ${ai.description}`
     ).join('\n');
 
     const systemPrompt = `You are an AI recommendation expert. Your task is to recommend the best AI tools from the provided database based on the user's query.
@@ -809,7 +836,7 @@ Analyze the user's query and return the indices (1-${aiDatabase.length}) of the 
 - Category preferences if specified
 
 IMPORTANT: You must return a valid JSON object with a "recommendations" key containing an array of indices.
-Return up to 12 indices, ordered from most to least relevant, prioritizing the specified category when one is given.
+Return up to 8 indices, ordered from most to least relevant, prioritizing the specified category when one is given.
 Example format: {"recommendations": [1, 5, 3]}
 
 Return ONLY the JSON object, nothing else.`;
@@ -825,9 +852,10 @@ Return a JSON object with a "recommendations" key containing the indices of the 
     console.log(`Using model: ${selectedModel} (available: ${availableModels.length} models)`);
 
     // Adjust max_tokens based on model (smaller models may have limits)
-    const maxTokens = selectedModel.includes('guard') || selectedModel.includes('prompt-guard') ? 256 : 512;
+    // The response is just indices, so a small limit is plenty and saves TPM.
+    const maxTokens = 150;
 
-    const chatCompletion = await groq.chat.completions.create({
+    const chatCompletion = await callGroqWithRetry({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }

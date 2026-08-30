@@ -14,7 +14,7 @@ export default function LegalPage({
   return (
     <main className="min-h-screen transition-colors">
       <SiteNav />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-8 sm:pb-12">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-4 pb-8 sm:pb-12">
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="mb-6">
           <ol className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">

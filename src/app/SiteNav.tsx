@@ -29,8 +29,8 @@ export default function SiteNav() {
   };
 
   return (
-    <nav className="sticky top-3 z-20 flex justify-center px-4">
-      <div className="flex items-center gap-1 sm:gap-2 rounded-full border border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur px-2 py-1.5 shadow-sm">
+    <nav className="fixed top-3 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
+      <div className="pointer-events-auto flex items-center gap-1 sm:gap-2 rounded-full border border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur px-2 py-1.5 shadow-sm">
         {links.map(({ href, label }) => {
           const active = pathname === href;
           return (

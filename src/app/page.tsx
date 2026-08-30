@@ -733,7 +733,7 @@ export default function Home() {
       {/* WebGL grid texture in the side gutters (desktop only) */}
       <GridCanvas dark={darkMode} />
       <SiteNav />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-8 sm:pb-16">
         {/* Header */}
         <header className="mb-10 sm:mb-16">
           <h1 className="flex items-center gap-2.5 text-4xl sm:text-5xl font-black text-neutral-900 dark:text-neutral-50 mb-2 sm:mb-4 tracking-tight">

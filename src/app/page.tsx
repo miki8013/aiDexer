@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import GridCanvas from "./GridCanvas";
+import SiteNav from "./SiteNav";
 
 // Maximum length of the user's search query. Kept aligned with the server-side
 // limit in api/recommend/route.ts so we never send a huge blob of text.
@@ -730,6 +732,7 @@ export default function Home() {
       />
       {/* WebGL grid texture in the side gutters (desktop only) */}
       <GridCanvas dark={darkMode} />
+      <SiteNav />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
         {/* Header */}
         <header className="mb-10 sm:mb-16">
@@ -748,27 +751,8 @@ export default function Home() {
 
         {/* Search Section */}
         <div className="mb-10 sm:mb-16">
-          {/* Toggles: AI mode + dark mode */}
-          <div className="flex items-center justify-between mb-4">
-            <button
-              type="button"
-              aria-label="Toggle dark mode"
-              onClick={() => setDarkMode((prev) => !prev)}
-              className="p-1.5 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-            >
-              {darkMode ? (
-                // Sun icon
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                </svg>
-              ) : (
-                // Moon icon
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
-            </button>
+          {/* AI mode toggle (dark mode toggle lives in the nav) */}
+          <div className="flex items-center justify-end mb-4">
             <label className="flex items-center gap-3 cursor-pointer select-none">
               <span className="text-sm text-neutral-600 dark:text-neutral-400">
                 AI Mode
@@ -792,15 +776,19 @@ export default function Home() {
               </button>
             </label>
           </div>
-          <form onSubmit={handleSearch} className="space-y-6">
+          <form onSubmit={handleSearch} className="space-y-5 sm:space-y-6">
             <div>
+              <label htmlFor="main-search" className="sr-only">
+                What do you want to do?
+              </label>
               <input
+                id="main-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value.slice(0, MAX_QUERY_LENGTH))}
                 placeholder="What do you want to do? (e.g., write code, create images)"
                 maxLength={MAX_QUERY_LENGTH}
-                className="w-full px-0 py-3 sm:py-4 text-lg sm:text-2xl font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 border-0 border-b-2 border-neutral-200 dark:border-neutral-700 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 bg-transparent transition-colors"
+                className="w-full px-4 py-3.5 sm:py-4 sm:px-5 text-base sm:text-2xl font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-sm focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 outline-none transition-colors"
               />
               <div className="mt-2 flex items-center justify-between text-xs">
                 <span className="text-neutral-400">
@@ -816,6 +804,16 @@ export default function Home() {
               </div>
             </div>
 
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full sm:w-auto px-8 py-3 bg-neutral-900 text-white font-medium rounded-lg hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading
+                ? useAi ? 'Asking AI...' : 'Searching...'
+                : 'Search'}
+            </button>
+
             <div className="flex flex-wrap gap-2">
               {categories.map((category) => (
                 <button
@@ -828,7 +826,7 @@ export default function Home() {
                       handleCategoryFilter(category);
                     }
                   }}
-                  className={`px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium rounded-lg transition-colors ${
                     selectedCategory === category
                       ? "bg-neutral-900 text-white"
                       : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
@@ -838,16 +836,6 @@ export default function Home() {
                 </button>
               ))}
             </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full sm:w-auto px-8 py-3 bg-neutral-900 text-white font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading
-                ? useAi ? 'Asking AI...' : 'Searching...'
-                : 'Search'}
-            </button>
           </form>
         </div>
 
@@ -1028,6 +1016,11 @@ export default function Home() {
         </div>
 
         <footer className="mt-16 sm:mt-24 pb-4 text-center text-xs text-neutral-400 dark:text-neutral-500 space-y-1.5">
+          <p>
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors">Privacy Policy</Link>
+            {" · "}
+            <Link href="/terms" className="underline underline-offset-2 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors">Terms of Service</Link>
+          </p>
           <p>&copy; {new Date().getFullYear()} aiDexer. All rights reserved.</p>
           <p>
             Made by{" "}

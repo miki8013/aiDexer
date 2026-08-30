@@ -5,11 +5,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --grid-line: rgba(23, 23, 23, 0.1);
 }
 
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --grid-line: rgba(237, 237, 237, 0.09);
 }
 
 body {

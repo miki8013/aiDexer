@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import GridCanvas from "./GridCanvas";
 
 // Maximum length of the user's search query. Kept aligned with the server-side
 // limit in api/recommend/route.ts so we never send a huge blob of text.
@@ -717,7 +718,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-white dark:bg-neutral-950 transition-colors">
+    <main className="min-h-screen transition-colors">
       {/* Subtle light-blue ambient glows - only in the top corners, fading away */}
       <div
         aria-hidden="true"
@@ -727,6 +728,8 @@ export default function Home() {
             "radial-gradient(700px circle at 12% -5%, rgba(147,197,253,0.14), transparent 60%), radial-gradient(600px circle at 88% -8%, rgba(147,197,253,0.12), transparent 55%)",
         }}
       />
+      {/* WebGL grid texture in the side gutters (desktop only) */}
+      <GridCanvas dark={darkMode} />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
         {/* Header */}
         <header className="mb-10 sm:mb-16">
@@ -1023,6 +1026,21 @@ export default function Home() {
         )}
 
         </div>
+
+        <footer className="mt-16 sm:mt-24 pb-4 text-center text-xs text-neutral-400 dark:text-neutral-500 space-y-1.5">
+          <p>&copy; {new Date().getFullYear()} aiDexer. All rights reserved.</p>
+          <p>
+            Made by{" "}
+            <a
+              href="https://www.michaelwassie.online/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+            >
+              Michael Wassie
+            </a>
+          </p>
+        </footer>
     </main>
   );
 }

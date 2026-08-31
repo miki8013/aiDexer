@@ -913,7 +913,7 @@ export default function Home() {
                     onChange={(e) => setSearchQuery(e.target.value.slice(0, MAX_QUERY_LENGTH))}
                     placeholder="Describe what you want to do…"
                     maxLength={MAX_QUERY_LENGTH}
-                    className="w-full pl-9 pr-3 py-2 text-sm sm:text-base font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 outline-none transition-colors"
+                    className="w-full pl-9 pr-3 py-2 text-sm sm:text-base font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-full focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 outline-none transition-colors"
                   />
                 </div>
                 {/* Budget dropdown (desktop) */}
@@ -921,7 +921,7 @@ export default function Home() {
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
                   aria-label="Budget"
-                  className="hidden sm:block shrink-0 px-2.5 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                  className="hidden sm:block shrink-0 px-3 py-2 text-sm font-medium rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
                 >
                   {BUDGET_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -932,7 +932,7 @@ export default function Home() {
                   value={selectedCategory}
                   onChange={(e) => handleCategoryClick(e.target.value)}
                   aria-label="Category"
-                  className="hidden sm:block shrink-0 max-w-40 px-2.5 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                  className="hidden sm:block shrink-0 max-w-40 px-3 py-2 text-sm font-medium rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
                 >
                   {categories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -941,7 +941,7 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="shrink-0 px-3 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="shrink-0 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-full hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (useAi ? 'Asking…' : 'Searching…') : 'Search'}
                 </button>
@@ -950,7 +950,7 @@ export default function Home() {
                   type="button"
                   onClick={() => setFiltersOpen((o) => !o)}
                   aria-expanded={filtersOpen}
-                  className="md:hidden shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                  className="md:hidden shrink-0 flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                     <path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h12M20 18h0" />
@@ -983,7 +983,7 @@ export default function Home() {
                       value={budget}
                       onChange={(e) => setBudget(e.target.value)}
                       aria-label="Budget"
-                      className="flex-1 px-2.5 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                      className="flex-1 px-3 py-2 text-sm font-medium rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
                     >
                       {BUDGET_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -996,7 +996,7 @@ export default function Home() {
                       value={selectedCategory}
                       onChange={(e) => handleCategoryClick(e.target.value)}
                       aria-label="Category"
-                      className="flex-1 px-2.5 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                      className="flex-1 px-3 py-2 text-sm font-medium rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
                     >
                       {categories.map((cat) => (
                         <option key={cat} value={cat}>{cat}</option>

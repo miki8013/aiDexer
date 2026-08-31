@@ -1011,18 +1011,46 @@ export default function Home() {
         ) : (
           <div className="sticky top-0 z-30 -mx-4 mb-6 sm:-mx-6 sm:mb-8">
             <div className="border-b border-neutral-200/80 dark:border-neutral-800/80 bg-white/90 dark:bg-neutral-900/90 backdrop-blur">
-              {/* Row 1: compact query + Search + mobile Filters toggle */}
-              <form onSubmit={handleSearch} className="flex items-center gap-2 px-4 sm:px-6 py-2.5">
+              {/* Single row: search + budget + category + Search (desktop) / search + Filters (mobile) */}
+              <form onSubmit={handleSearch} className="flex items-center gap-2 px-4 sm:px-6 py-2">
                 <label htmlFor="main-search" className="sr-only">What do you want to do?</label>
-                <input
-                  id="main-search"
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value.slice(0, MAX_QUERY_LENGTH))}
-                  placeholder="Describe what you want to do…"
-                  maxLength={MAX_QUERY_LENGTH}
-                  className="flex-1 min-w-0 px-3 py-2 text-sm sm:text-base font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 outline-none transition-colors"
-                />
+                <div className="relative flex-1 min-w-0">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M20 20l-3.5-3.5" />
+                  </svg>
+                  <input
+                    id="main-search"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value.slice(0, MAX_QUERY_LENGTH))}
+                    placeholder="Describe what you want to do…"
+                    maxLength={MAX_QUERY_LENGTH}
+                    className="w-full pl-9 pr-3 py-2 text-sm sm:text-base font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 outline-none transition-colors"
+                  />
+                </div>
+                {/* Budget dropdown (desktop) */}
+                <select
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  aria-label="Budget"
+                  className="hidden sm:block shrink-0 px-2.5 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                >
+                  {BUDGET_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                {/* Category dropdown (desktop) */}
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => handleCategoryClick(e.target.value)}
+                  aria-label="Category"
+                  className="hidden sm:block shrink-0 max-w-40 px-2.5 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -1030,63 +1058,79 @@ export default function Home() {
                 >
                   {isLoading ? (useAi ? 'Asking…' : 'Searching…') : 'Search'}
                 </button>
-                {/* Mobile-only: toggle the category/budget panel */}
+                {/* Mobile-only: toggle the filters panel */}
                 <button
                   type="button"
                   onClick={() => setFiltersOpen((o) => !o)}
                   aria-expanded={filtersOpen}
-                  className="shrink-0 md:hidden px-3 py-2 text-sm font-medium rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                  className="md:hidden shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                 >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h12M20 18h0" />
+                    <circle cx="15" cy="6" r="2" />
+                    <circle cx="9" cy="12" r="2" />
+                    <circle cx="18" cy="18" r="2" />
+                  </svg>
                   {filtersOpen ? 'Close' : 'Filters'}
                 </button>
+                {/* Desktop AI mode toggle */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={useAi}
+                  onClick={() => setUseAi((prev) => !prev)}
+                  aria-label="AI Mode"
+                  className="hidden md:flex shrink-0 items-center"
+                >
+                  <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${useAi ? 'translate-x-5 bg-white dark:bg-neutral-900' : 'translate-x-1 bg-white'}`} />
+                  </span>
+                </button>
               </form>
-              {/* Row 2: category + budget + AI mode. Always inline on md+, expandable behind Filters on mobile. */}
-              <div className={`${filtersOpen ? 'block' : 'hidden md:block'}`}>
-                <div className="px-4 sm:px-6 pb-3 flex flex-wrap items-center gap-x-2 gap-y-2">
-                  <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Category</span>
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => handleCategoryClick(cat)}
-                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                        selectedCategory === cat
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                      }`}
+              {/* Mobile filters panel: budget + category + AI mode */}
+              {filtersOpen && (
+                <div className="md:hidden px-4 pb-3 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Budget</span>
+                    <select
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      aria-label="Budget"
+                      className="flex-1 px-2.5 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
                     >
-                      {cat}
-                    </button>
-                  ))}
-                  <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Budget</span>
-                  {BUDGET_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setBudget(opt.value)}
-                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                        budget === opt.value
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                      }`}
+                      {BUDGET_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Category</span>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => handleCategoryClick(e.target.value)}
+                      aria-label="Category"
+                      className="flex-1 px-2.5 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none"
                     >
-                      {opt.label}
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">AI Mode</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={useAi}
+                      onClick={() => setUseAi((prev) => !prev)}
+                    >
+                      <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${useAi ? 'translate-x-5 bg-white dark:bg-neutral-900' : 'translate-x-1 bg-white'}`} />
+                      </span>
                     </button>
-                  ))}
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={useAi}
-                    onClick={() => setUseAi((prev) => !prev)}
-                    className="ml-auto flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400"
-                  >
-                    <span>AI Mode</span>
-                    <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${useAi ? 'translate-x-5 bg-white dark:bg-neutral-900' : 'translate-x-1 bg-white'}`} />
-                    </span>
-                  </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}

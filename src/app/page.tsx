@@ -550,6 +550,56 @@ const aiDatabase: AIModel[] = [
     access: "API, Cloud",
     description: "A cloud platform for running, fine-tuning, and serving open-source AI models.",
     url: "https://www.together.ai",
+  },
+  {
+    name: "OpenRefine",
+    category: "Data & Analytics",
+    strengths: ["Data cleaning", "CSV handling", "Open source", "Local running"],
+    bestFor: ["Cleaning messy data", "CSV & Excel fixes", "Transforming datasets", "Privacy"],
+    pricing: "Free (open source)",
+    access: "Local, Desktop, Browser",
+    description: "A free, open-source desktop tool for cleaning, transforming, and reconciling messy CSV and spreadsheet data offline with no API limits.",
+    url: "https://openrefine.org",
+  },
+  {
+    name: "PandasAI",
+    category: "Data & Analytics",
+    strengths: ["Natural language queries", "Python & pandas", "Open source", "Local"],
+    bestFor: ["Analyzing CSVs with plain English", "Data analysis", "Reports", "Privacy"],
+    pricing: "Free (open source)",
+    access: "Local, Python library",
+    description: "Open-source library that wraps pandas so you can ask questions about your CSV and tabular data in plain English, fully local and offline.",
+    url: "https://github.com/sinaptik-ai/pandas-ai",
+  },
+  {
+    name: "Row Zero",
+    category: "Data & Analytics",
+    strengths: ["Spreadsheet", "AI data analysis", "Collaboration", "CSV import"],
+    bestFor: ["Analyzing large CSV files", "Spreadsheets", "Data work", "Teams"],
+    pricing: "Free tier available, Paid from $15/month",
+    access: "Web",
+    description: "An AI-powered spreadsheet built for large messy CSV and Excel files, with natural-language formulas and analysis without hitting chat-window limits.",
+    url: "https://rowzero.io",
+  },
+  {
+    name: "Julius AI",
+    category: "Data & Analytics",
+    strengths: ["Data analysis", "Charts and graphs", "CSV & Excel", "Python under the hood"],
+    bestFor: ["Cleaning and analyzing CSVs", "Visualizing data", "Reports", "Non-coders"],
+    pricing: "$20/month",
+    access: "Web",
+    description: "Analyzes messy CSV, Excel, and other data files with natural language, generating charts and statistics — great for people who can't code.",
+    url: "https://julius.ai",
+  },
+  {
+    name: "Tableau",
+    category: "Data & Analytics",
+    strengths: ["Business analytics", "Dashboards", "Visualization", "Enterprise"],
+    bestFor: ["Dashboards", "Business intelligence", "Large datasets", "Teams"],
+    pricing: "$75/month",
+    access: "Web, Desktop",
+    description: "A leading business-intelligence platform for powerful dashboards and analytics on complex datasets, aimed at analysts and enterprises.",
+    url: "https://www.tableau.com",
   }
 ];
 
@@ -558,6 +608,85 @@ function getSuggestions(category: string): AIModel[] {
     return aiDatabase.filter(ai => ai.category === category);
   }
   return aiDatabase; // Show all tools as candidates; displayCount controls how many are visible
+}
+
+/** Parse a numeric monthly entry price + whether a free tier exists (client mirror of the API helper). */
+function parseToolPrice(pricing: string): { amount: number | null; hasFree: boolean } {
+  const lower = pricing.toLowerCase();
+  const hasFree = /free|open[- ]?source|self-?hosted/i.test(lower);
+  const amounts = [...pricing.matchAll(/\$(\d+(?:\.\d+)?)/g)].map((m) => parseFloat(m[1]));
+  let amount: number | null = null;
+  if (amounts.length > 0) amount = Math.min(...amounts);
+  return { amount, hasFree };
+}
+
+/** True when a tool fits the selected budget (any / free-only / under $N). */
+function toolPassesBudget(pricing: string, budget: string): boolean {
+  if (budget === 'any') return true;
+  const { amount, hasFree } = parseToolPrice(pricing);
+  if (budget === 'free') return hasFree;
+  const max = parseInt(budget, 10);
+  return hasFree || (amount !== null && amount <= max);
+}
+
+const BUDGET_OPTIONS = [
+  { value: 'any', label: 'Any price' },
+  { value: 'free', label: 'Free only' },
+  { value: '10', label: 'Under $10' },
+  { value: '20', label: 'Under $20' },
+  { value: '50', label: 'Under $50' },
+];
+
+/** Inline horizontal bar chart comparing the monthly entry price of the given tools. */
+function PriceChart({ tools }: { tools: AIModel[] }) {
+  const data = tools
+    .map((t) => ({ name: t.name, ...parseToolPrice(t.pricing) }))
+    .sort((a, b) => {
+      const av = a.hasFree ? 0 : a.amount ?? Number.MAX_SAFE_INTEGER;
+      const bv = b.hasFree ? 0 : b.amount ?? Number.MAX_SAFE_INTEGER;
+      return av - bv;
+    });
+  if (data.length === 0) return null;
+  const maxPaid = Math.max(1, ...data.map((d) => d.amount ?? 0));
+
+  return (
+    <div className="mb-8 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 sm:p-5">
+      <h3 className="text-sm font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wide mb-4">
+        Monthly price comparison
+      </h3>
+      <div className="space-y-2.5">
+        {data.map((d) => {
+          const isFree = d.hasFree;
+          const pct = isFree ? 100 : d.amount == null ? 4 : Math.max(6, (d.amount / Math.max(maxPaid, 1)) * 100);
+          const barClass = isFree
+            ? 'bg-emerald-500'
+            : d.amount == null
+            ? 'bg-neutral-300 dark:bg-neutral-600'
+            : 'bg-neutral-900 dark:bg-white dark:text-neutral-900';
+          return (
+            <div key={d.name} className="flex items-center gap-3">
+              <div className="w-28 sm:w-44 shrink-0 truncate text-xs sm:text-sm text-neutral-700 dark:text-neutral-300" title={d.name}>
+                {d.name}
+              </div>
+              <div className="flex-1 h-4 bg-neutral-100 dark:bg-neutral-800 rounded overflow-hidden">
+                <div
+                  className={`h-full flex items-center px-2 text-[11px] font-semibold text-white ${barClass}`}
+                  style={{ width: `${pct}%` }}
+                >
+                  {isFree && <span className="truncate">Free</span>}
+                  {!isFree && d.amount != null && <span className="truncate">{`$${d.amount}`}</span>}
+                </div>
+              </div>
+              <div className="w-14 shrink-0 text-right text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                {isFree ? 'Free' : d.amount == null ? '—' : `$${d.amount}`}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-xs text-neutral-400">Entry-level price from each tool&apos;s pricing page.</p>
+    </div>
+  );
 }
 
 export default function Home() {
@@ -572,6 +701,8 @@ export default function Home() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [resultSource, setResultSource] = useState<"gemini" | "keyword" | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  // Budget filter: 'any' | 'free' | '10' | '20' | '50'
+  const [budget, setBudget] = useState<string>('any');
 
   // Restore saved theme on mount; if the user never chose, follow their OS
   useEffect(() => {
@@ -613,6 +744,7 @@ export default function Home() {
           query: limitedQuery,
           category: selectedCategory === 'All' ? undefined : selectedCategory,
           useAi,
+          budget: budget === 'any' ? null : budget,
         }),
       });
 
@@ -718,6 +850,19 @@ export default function Home() {
     setDisplayCount(4); // Reset how many are visible when switching category
     setHasSearched(false); // Reset search state when just filtering
   };
+
+  // Re-run the search when the budget filter changes so the server reapplies
+  // its constraints/ranking (the render filter below is a safety net too).
+  useEffect(() => {
+    if (hasSearched && searchQuery.trim()) {
+      runSearch(searchQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budget]);
+
+  // Budget-filtered views used for this render (results + pre-search list).
+  const visibleRecs = recommendations.filter((ai) => toolPassesBudget(ai.pricing, budget));
+  const visibleStatic = staticSuggestions.filter((ai) => toolPassesBudget(ai.pricing, budget));
 
   return (
     <main className="min-h-screen transition-colors">
@@ -836,6 +981,26 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+                Budget
+              </span>
+              {BUDGET_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setBudget(opt.value)}
+                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                    budget === opt.value
+                      ? "bg-neutral-900 text-white"
+                      : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </form>
         </div>
 
@@ -846,11 +1011,11 @@ export default function Home() {
               <p className="font-medium mb-1">Search problem</p>
               <p className="text-sm">{searchError}</p>
             </div>
-          ) : recommendations.length > 0 ? (
+          ) : visibleRecs.length > 0 ? (
             <div className="mb-10 sm:mb-16">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-6">
                 <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                  {recommendations.length} result{recommendations.length !== 1 ? 's' : ''} found
+                  {visibleRecs.length} result{visibleRecs.length !== 1 ? 's' : ''} found
                 </h2>
                 {resultSource === 'gemini' && (
                   <span className="text-xs text-neutral-400">
@@ -858,8 +1023,9 @@ export default function Home() {
                   </span>
                 )}
               </div>
+              <PriceChart tools={visibleRecs.slice(0, displayCount)} />
               <div className="space-y-4">
-                {recommendations.slice(0, displayCount).map((ai, index) => (
+                {visibleRecs.slice(0, displayCount).map((ai, index) => (
                   <div
                     key={index}
                     className="border border-neutral-200 p-4 sm:p-6 hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600 transition-colors"
@@ -913,7 +1079,7 @@ export default function Home() {
               </div>
 
               {/* Load More Button */}
-              {displayCount < recommendations.length && (
+              {displayCount < visibleRecs.length && (
                 <div className="mt-8 text-center">
                   <button
                     onClick={handleLoadMore}
@@ -938,13 +1104,14 @@ export default function Home() {
           )
         ) : (
           // Static Suggestions (before user search)
-          staticSuggestions.length > 0 && (
+          visibleStatic.length > 0 && (
             <div className="mb-10 sm:mb-16">
               <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-6">
                 {selectedCategory === "All" ? "Popular AI Tools" : `Popular ${selectedCategory} Tools`}
               </h2>
+              <PriceChart tools={visibleStatic.slice(0, displayCount)} />
               <div className="space-y-4">
-                {staticSuggestions.slice(0, displayCount).map((ai, index) => (
+                {visibleStatic.slice(0, displayCount).map((ai, index) => (
                   <div
                     key={index}
                     className="border border-neutral-200 p-4 sm:p-6 hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600 transition-colors"
@@ -998,7 +1165,7 @@ export default function Home() {
               </div>
 
               {/* Load More Button */}
-              {displayCount < staticSuggestions.length && (
+              {displayCount < visibleStatic.length && (
                 <div className="mt-8 text-center">
                   <button
                     onClick={handleLoadMorePopular}

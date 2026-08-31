@@ -127,7 +127,90 @@ const SYNONYMS: Record<string, string> = {
   seo: 'seo marketing',
   website: 'web',
   sites: 'web',
+  csv: 'data cleaning',
+  csvs: 'data cleaning',
+  spreadsheet: 'data',
+  spreadsheets: 'data',
+  excel: 'data',
+  dataset: 'data',
+  datasets: 'data',
+  pandas: 'data python',
+  messy: 'cleaning',
+  clean: 'cleaning',
+  cleaning: 'cleaning data',
+  analyze: 'analysis',
+  analyse: 'analysis',
+  analytics: 'analysis',
+  analyzing: 'analysis',
 };
+
+/**
+ * Extract a numeric monthly price and whether a free/basic tier exists from a
+ * human-friendly pricing string. `amount` is the entry-level paid tier in USD
+ * per month, or null when it can't be pinned down (e.g. "Pay-per-use").
+ */
+function parseToolPrice(pricing: string): { amount: number | null; hasFree: boolean } {
+  const lower = pricing.toLowerCase();
+  const hasFree = /free|open[- ]?source|self-?hosted/i.test(lower);
+  const amounts = [...pricing.matchAll(/\$(\d+(?:\.\d+)?)/g)].map((m) => parseFloat(m[1]));
+  let amount: number | null = null;
+  if (amounts.length > 0) {
+    // Take the smallest figure — that's the entry-level paid tier.
+    amount = Math.min(...amounts);
+    // Tame absurd ranges so the chart/filters stay sane.
+    if (amount > 5000) amount = 5000;
+  }
+  return { amount, hasFree };
+}
+
+interface Constraints {
+  budgetMax: number | null; // null = no upper cap
+  freeOnly: boolean; // user only wants free tools
+  noApi: boolean; // user wants local / offline / no API limits
+}
+
+/** Pull practical constraints (budget, free-only, offline) out of a free-form query. */
+function parseConstraints(query: string): Constraints {
+  const q = query.toLowerCase().replace(/[#$%,]/g, ' ').replace(/\s+/g, ' ').trim();
+  const c: Constraints = { budgetMax: null, freeOnly: false, noApi: false };
+
+  const capMatch = q.match(/(?:under|below|less than|at most|max(?:imum)?|budget(?: of)?|cheaper than)\s*(\d{1,4})/);
+  if (capMatch) {
+    const n = parseInt(capMatch[1], 10);
+    if (n > 0 && n <= 5000) c.budgetMax = n;
+  } else {
+    const lt = q.match(/<\s*(\d{1,4})/);
+    if (lt) {
+      const n = parseInt(lt[1], 10);
+      if (n > 0 && n <= 5000) c.budgetMax = n;
+    }
+  }
+
+  if (/(?:only\s+)?free\b|no\s*(pay|cost|charge)|free[\s-]?tier/i.test(q) && !(c.budgetMax && c.budgetMax > 0)) {
+    c.freeOnly = true;
+  }
+
+  c.noApi = /no\s*(api|server|cloud|connection)|without\s*(api|server|cloud)|offline|self-?hosted|open[- ]?source|local(ly)?|on\s+(my|your|our)\s+(machine|computer|device|pc)|no\s*(rate|usage|api)\s*limit|api\s*limit/i.test(q);
+
+  return c;
+}
+
+/** True when a tool's pricing satisfies the user's budget/free constraints. */
+function passesBudget(pricing: string, c: Constraints): boolean {
+  const { amount, hasFree } = parseToolPrice(pricing);
+  if (c.freeOnly) return hasFree;
+  if (c.budgetMax !== null) return hasFree || (amount !== null && amount <= c.budgetMax);
+  return true;
+}
+
+/** Human-readable summary of constraints, injected into the Gemini prompt. */
+function constraintsSummary(c: Constraints): string | null {
+  const parts: string[] = [];
+  if (c.freeOnly) parts.push('only free tools, nothing paid');
+  else if (c.budgetMax !== null) parts.push(`nothing more than $${c.budgetMax} per month`);
+  if (c.noApi) parts.push('local, offline, open-source, or that do NOT hit API/rate limits');
+  return parts.length > 0 ? parts.join('; ') : null;
+}
 
 function tokenize(text: string): string[] {
   const raw = text
@@ -278,7 +361,11 @@ function setCachedGemini(key: string, indices: number[]): void {
  * Returns 1-based indices into aiDatabase, best match first.
  * Throws on failure so the caller can fall back to keyword scoring.
  */
-async function getGeminiRecommendations(query: string, category: string | null): Promise<number[]> {
+async function getGeminiRecommendations(
+  query: string,
+  category: string | null,
+  constraints: Constraints
+): Promise<number[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return [];
   if (Date.now() < geminiDisabledUntil) {
@@ -286,7 +373,7 @@ async function getGeminiRecommendations(query: string, category: string | null):
   }
 
   // Serve repeated queries from cache — saves tokens and latency
-  const cacheKey = `${query.toLowerCase()}|${category ?? ''}`;
+  const cacheKey = `${query.toLowerCase()}|${category ?? ''}|${JSON.stringify(constraints)}`;
   const cached = getCachedGemini(cacheKey);
   if (cached) return cached;
 
@@ -303,6 +390,7 @@ Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,
 
   const userPrompt = `User query: "${query}"${category ? `\nPreferred category: ${category}` : ''}`;
 
+  const constraintLine = constraintsSummary(constraints);
   let lastError: unknown = null;
   // Try each candidate model, remembering which one worked
   for (let attempt = 0; attempt < GEMINI_MODELS.length; attempt++) {
@@ -316,7 +404,9 @@ Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,
         signal: AbortSignal.timeout(15000),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          contents: [
+            { role: 'user', parts: [{ text: userPrompt }, ...(constraintLine ? [{ text: `IMPORTANT requirements the user stated: ${constraintLine}` }] : [])] },
+          ],
           generationConfig: { temperature: 0.3, maxOutputTokens: 64 },
         }),
       });
@@ -337,7 +427,10 @@ Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,
       // Parse indices from the reply — handles [3,12,1] and stray text around it
       const match = reply.match(/\[[\d\s,]*\]/);
       if (!match) return [];
-      const indices = (JSON.parse(match[0]) as number[]).filter((n) => Number.isInteger(n) && n >= 1 && n <= aiDatabase.length);
+      const indices = (JSON.parse(match[0]) as number[])
+        .filter((n) => Number.isInteger(n) && n >= 1 && n <= aiDatabase.length)
+        // Hard guard: drop any pick that breaks the user's stated budget.
+        .filter((n) => passesBudget(aiDatabase[n - 1].pricing, constraints));
       setCachedGemini(cacheKey, indices);
       return indices;
     } catch (error) {
@@ -389,10 +482,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Merge constraints parsed from the free-form query with an explicit UI budget
+    // filter (e.g. a "Free only" / "Under $20" dropdown) into one effective set.
+    const constraints = parseConstraints(query);
+    const budgetField = typeof body.budget === 'string' ? body.budget.trim() : null;
+    if (budgetField && budgetField !== 'any') {
+      if (budgetField === 'free') {
+        constraints.freeOnly = true;
+        constraints.budgetMax = null;
+      } else {
+        const n = parseInt(budgetField, 10);
+        if (Number.isInteger(n) && n > 0) {
+          constraints.budgetMax = n;
+          constraints.freeOnly = false;
+        }
+      }
+    }
+
     // --- AI mode: use Gemini when the toggle is on, free scoring as fallback ---
     if (useAi && process.env.GEMINI_API_KEY) {
       try {
-        const geminiIndices = await getGeminiRecommendations(query, category);
+        const geminiIndices = await getGeminiRecommendations(query, category, constraints);
         if (geminiIndices.length > 0) {
           const recommendations = geminiIndices
             .map((i) => aiDatabase[i - 1])
@@ -417,18 +527,40 @@ export async function POST(request: NextRequest) {
 
     const queryTokens = tokenize(query);
 
-    // Score every tool and rank
+    // Score every tool and rank. Extra weight is added for tools that fit the
+    // user's stated constraints (offline/open-source, free, within budget).
+    // Anything that breaks the budget is dropped, so "unrelated expensive tools"
+    // never get returned for a "free or under $X" request.
     const scored = toolSearchIndex
-      .map((entry) => ({ tool: entry.tool, score: scoreTool(queryTokens, category, entry) }))
-      .filter((entry) => entry.score > 0)
+      .map((entry) => {
+        let score = scoreTool(queryTokens, category, entry);
+        if (constraints.noApi && /open[- ]?source|self-?hosted|local|desktop|privacy|offline/i.test(
+          [entry.tool.pricing, entry.tool.access, entry.tool.strengths.join(' ')].join(' ')
+        )) {
+          score += 9;
+        }
+        const { hasFree } = parseToolPrice(entry.tool.pricing);
+        if (constraints.freeOnly && hasFree) score += 5;
+        if (constraints.budgetMax !== null && hasFree) score += 2;
+        return { tool: entry.tool, score };
+      })
+      .filter((entry) => entry.score > 0 && passesBudget(entry.tool.pricing, constraints))
       .sort((a, b) => b.score - a.score)
       .slice(0, 8);
 
-    // If nothing matched, fall back to top general-purpose tools
-    const recommendations =
-      scored.length > 0
-        ? scored.map((entry) => entry.tool)
-        : aiDatabase.filter((tool) => tool.category === 'General Purpose').slice(0, 5);
+    // If nothing keyword-matched but the user gave budget/offline constraints,
+    // return constrained picks rather than unrelated general-purpose tools.
+    let recommendations;
+    if (scored.length > 0) {
+      recommendations = scored.map((entry) => entry.tool);
+    } else if (constraints.freeOnly || constraints.budgetMax !== null || constraints.noApi) {
+      recommendations = aiDatabase
+        .filter((tool) => passesBudget(tool.pricing, constraints))
+        .sort((a, b) => Number(parseToolPrice(b.pricing).hasFree) - Number(parseToolPrice(a.pricing).hasFree))
+        .slice(0, 8);
+    } else {
+      recommendations = aiDatabase.filter((tool) => tool.category === 'General Purpose').slice(0, 5);
+    }
 
     return NextResponse.json({ recommendations, source: 'keyword' }, { headers: securityHeaders });
   } catch (error) {

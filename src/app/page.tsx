@@ -899,7 +899,7 @@ export default function Home() {
           <div className="sticky top-0 z-30 -mx-4 mb-6 sm:-mx-6 sm:mb-8">
             <div className="border-b border-neutral-200/80 dark:border-neutral-800/80 bg-white/90 dark:bg-neutral-900/90 backdrop-blur">
               {/* Single row: search + budget + category + Search (desktop) / search + Filters (mobile) */}
-              <form onSubmit={handleSearch} className="flex items-center gap-2 px-4 sm:px-6 py-2">
+              <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2 px-4 sm:px-6 py-2">
                 <label htmlFor="main-search" className="sr-only">What do you want to do?</label>
                 <div className="relative flex-1 min-w-0">
                   <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -941,7 +941,7 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="shrink-0 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="shrink-0 px-3 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (useAi ? 'Asking…' : 'Searching…') : 'Search'}
                 </button>
@@ -960,13 +960,13 @@ export default function Home() {
                   </svg>
                   {filtersOpen ? 'Close' : 'Filters'}
                 </button>
-                {/* AI mode toggle (visible on all sizes) */}
+                {/* AI mode toggle (own row on mobile, inline on desktop) */}
                 <button
                   type="button"
                   role="switch"
                   aria-checked={useAi}
                   onClick={() => setUseAi((prev) => !prev)}
-                  className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+                  className="flex w-full sm:w-auto shrink-0 items-center justify-center sm:justify-start gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
                 >
                   <span className={useAi ? 'text-neutral-900 dark:text-neutral-100 font-semibold' : ''}>AI Mode</span>
                   <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>

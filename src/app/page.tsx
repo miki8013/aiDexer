@@ -874,7 +874,7 @@ export default function Home() {
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(800px circle at 12% -5%, rgba(147,197,253,0.32), transparent 60%), radial-gradient(700px circle at 88% -8%, rgba(147,197,253,0.28), transparent 55%)",
+            "radial-gradient(900px circle at 12% -5%, rgba(147,197,253,0.55), transparent 62%), radial-gradient(800px circle at 88% -8%, rgba(147,197,253,0.48), transparent 57%)",
         }}
       />
       {/* WebGL grid texture in the side gutters (desktop only) */}

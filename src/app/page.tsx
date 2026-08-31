@@ -1026,6 +1026,11 @@ export default function Home() {
                     AI picks
                   </span>
                 )}
+                {resultSource === 'keyword' && useAi && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    Gemini unavailable right now — used built-in matching
+                  </span>
+                )}
               </div>
               <PriceChart tools={visibleRecs.slice(0, displayCount)} />
               <div className="space-y-4">

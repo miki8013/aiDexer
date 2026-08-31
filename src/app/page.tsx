@@ -960,13 +960,13 @@ export default function Home() {
                   </svg>
                   {filtersOpen ? 'Close' : 'Filters'}
                 </button>
-                {/* Desktop AI mode toggle */}
+                {/* AI mode toggle (visible on all sizes) */}
                 <button
                   type="button"
                   role="switch"
                   aria-checked={useAi}
                   onClick={() => setUseAi((prev) => !prev)}
-                  className="hidden md:flex shrink-0 items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+                  className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
                 >
                   <span className={useAi ? 'text-neutral-900 dark:text-neutral-100 font-semibold' : ''}>AI Mode</span>
                   <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
@@ -1002,19 +1002,6 @@ export default function Home() {
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                     </select>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">AI Mode</span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={useAi}
-                      onClick={() => setUseAi((prev) => !prev)}
-                    >
-                      <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
-                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${useAi ? 'translate-x-5 bg-white dark:bg-neutral-900' : 'translate-x-1 bg-white'}`} />
-                      </span>
-                    </button>
                   </div>
                 </div>
               )}

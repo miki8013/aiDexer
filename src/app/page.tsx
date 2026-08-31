@@ -881,8 +881,6 @@ export default function Home() {
       <GridCanvas dark={darkMode} />
       <SiteNav />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-4 pb-8 sm:pb-16">
-        {!hasSearched ? (
-        <>
         {/* Header */}
         <header className="mb-10 sm:mb-16">
           <h1 className="flex items-center gap-2.5 text-4xl sm:text-5xl font-black text-neutral-900 dark:text-neutral-50 mb-2 sm:mb-4 tracking-tight">
@@ -898,117 +896,6 @@ export default function Home() {
           </p>
         </header>
 
-        {/* Search Section */}
-        <div className="mb-10 sm:mb-16">
-          {/* AI mode toggle (dark mode toggle lives in the nav) */}
-          <div className="flex items-center justify-end mb-4">
-            <label className="flex items-center gap-3 cursor-pointer select-none">
-              <span className="text-sm text-neutral-600 dark:text-neutral-400">
-                AI Mode
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={useAi}
-                onClick={() => setUseAi((prev) => !prev)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
-                    useAi
-                      ? 'translate-x-6 bg-white dark:bg-neutral-900'
-                      : 'translate-x-1 bg-white'
-                  }`}
-                />
-              </button>
-            </label>
-          </div>
-          <form onSubmit={handleSearch} className="space-y-5 sm:space-y-6">
-            <div>
-              <label htmlFor="main-search" className="sr-only">
-                What do you want to do?
-              </label>
-              <input
-                id="main-search"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value.slice(0, MAX_QUERY_LENGTH))}
-                placeholder="What do you want to do? (e.g., write code, create images)"
-                maxLength={MAX_QUERY_LENGTH}
-                className="w-full px-4 py-3.5 sm:py-4 sm:px-5 text-base sm:text-2xl font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-sm focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 outline-none transition-colors"
-              />
-              <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-neutral-400">
-                  {searchQuery.trim() ? undefined : 'Keep it short — just describe what you want to do.'}
-                </span>
-                <span className={
-                  searchQuery.length >= MAX_QUERY_LENGTH
-                    ? "text-red-600 font-medium"
-                    : "text-neutral-400"
-                }>
-                  {searchQuery.length}/{MAX_QUERY_LENGTH}
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full sm:w-auto px-8 py-3 bg-neutral-900 text-white font-medium rounded-lg hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading
-                ? useAi ? 'Asking AI...' : 'Searching...'
-                : 'Search'}
-            </button>
-
-            <div className="flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => {
-                    if (hasSearched) {
-                      handleCategoryClick(category);
-                    } else {
-                      handleCategoryFilter(category);
-                    }
-                  }}
-                  className={`px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium rounded-lg transition-colors ${
-                    selectedCategory === category
-                      ? "bg-neutral-900 text-white"
-                      : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
-                Budget
-              </span>
-              {BUDGET_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setBudget(opt.value)}
-                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
-                    budget === opt.value
-                      ? "bg-neutral-900 text-white"
-                      : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </form>
-        </div>
-        </>
-        ) : (
           <div className="sticky top-0 z-30 -mx-4 mb-6 sm:-mx-6 sm:mb-8">
             <div className="border-b border-neutral-200/80 dark:border-neutral-800/80 bg-white/90 dark:bg-neutral-900/90 backdrop-blur">
               {/* Single row: search + budget + category + Search (desktop) / search + Filters (mobile) */}
@@ -1133,7 +1020,6 @@ export default function Home() {
               )}
             </div>
           </div>
-        )}
 
         {/* Results Section */}
         {hasSearched ? (

@@ -1,4 +1,4 @@
-﻿export interface AIModel {
+export interface AIModel {
   name: string;
   category: string;
   strengths: string[];
@@ -338,7 +338,7 @@ export const aiDatabase: AIModel[] = [
     pricing: "Free for individuals",
     access: "IDE extension",
     description: "Free AI code completion and chat tool supporting multiple IDEs and languages.",
-    url: "https://codeium.com",
+    url: "https://windsurf.com",
   },
   {
     name: "Windsurf",
@@ -348,7 +348,7 @@ export const aiDatabase: AIModel[] = [
     pricing: "Free tier available, Paid from $15/month",
     access: "Desktop app",
     description: "AI-powered code editor with agent capabilities for complex development tasks.",
-    url: "https://www.codeium.com/windsurf",
+    url: "https://windsurf.com",
   },
   {
     name: "v0 by Vercel",
@@ -369,16 +369,6 @@ export const aiDatabase: AIModel[] = [
     access: "Web",
     description: "AI presentation tool that automatically formats slides as you add content.",
     url: "https://www.beautiful.ai",
-  },
-  {
-    name: "Tome",
-    category: "Design",
-    strengths: ["AI storytelling", "Generative narratives", "3D assets", "Embeds"],
-    bestFor: ["Presentations", "Pitches", "Storytelling", "Reports"],
-    pricing: "Free tier available, Paid from $8/month",
-    access: "Web",
-    description: "AI-powered storytelling platform that generates narrative presentations.",
-    url: "https://tome.app",
   },
   {
     name: "Gamma",
@@ -468,7 +458,7 @@ export const aiDatabase: AIModel[] = [
     pricing: "Free tier available, Paid from $10/month",
     access: "Web",
     description: "AI research assistant that automates literature reviews and data extraction.",
-    url: "https://elicit.org",
+    url: "https://elicit.com",
   },
   {
     name: "ChatPDF",
@@ -618,7 +608,7 @@ export const aiDatabase: AIModel[] = [
     pricing: "Free tier available, Paid from $15/month",
     access: "Web",
     description: "AI image generation platform with canvas editing and style filters.",
-    url: "https://playground.ai",
+    url: "https://playground.com",
   },
   {
     name: "Craiyon",
@@ -717,7 +707,7 @@ export const aiDatabase: AIModel[] = [
     bestFor: ["Cleaning and analyzing CSVs", "Visualizing data", "Reports", "Non-coders"],
     pricing: "$20/month",
     access: "Web",
-    description: "Analyzes messy CSV, Excel, and other data files with natural language, generating charts and statistics — great for people who can't code.",
+    description: "Analyzes messy CSV, Excel, and other data files with natural language, generating charts and statistics � great for people who can't code.",
     url: "https://julius.ai",
   },
   {

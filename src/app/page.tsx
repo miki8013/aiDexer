@@ -239,7 +239,7 @@ const aiDatabase: AIModel[] = [
     pricing: "Free, Premium from $10/month",
     access: "IDE extension, Web",
     description: "A free AI code completion and chat tool supporting many IDEs and languages.",
-    url: "https://codeium.com",
+    url: "https://windsurf.com",
   },
   {
     name: "Ideogram",
@@ -470,16 +470,6 @@ const aiDatabase: AIModel[] = [
     access: "Web, API",
     description: "Realistic AI text-to-speech and voice cloning platform with a large voice library.",
     url: "https://play.ht",
-  },
-  {
-    name: "Tome",
-    category: "Presentations",
-    strengths: ["Deck generation", "Storytelling", "AI templates", "Branded design"],
-    bestFor: ["Pitch decks", "Proposals", "Presentations", "Narrative decks"],
-    pricing: "Free tier, Paid from $20/month",
-    access: "Web",
-    description: "An AI storytelling tool that generates polished presentation decks from prompts.",
-    url: "https://tome.app",
   },
   {
     name: "Beautiful.ai",

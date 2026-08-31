@@ -966,9 +966,9 @@ export default function Home() {
                   role="switch"
                   aria-checked={useAi}
                   onClick={() => setUseAi((prev) => !prev)}
-                  aria-label="AI Mode"
-                  className="hidden md:flex shrink-0 items-center"
+                  className="hidden md:flex shrink-0 items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
                 >
+                  <span className={useAi ? 'text-neutral-900 dark:text-neutral-100 font-semibold' : ''}>AI Mode</span>
                   <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${useAi ? 'translate-x-5 bg-white dark:bg-neutral-900' : 'translate-x-1 bg-white'}`} />
                   </span>

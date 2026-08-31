@@ -366,6 +366,8 @@ async function getAvailableModels(apiKey: string): Promise<string[]> {
 // skip it entirely for a cooldown period so the API stays fast.
 let geminiFailures = 0;
 let geminiDisabledUntil = 0;
+// Last real reason Gemini failed (for surfacing in the UI when we fall back).
+let lastGeminiError: string | null = null;
 const GEMINI_MAX_FAILURES = 2;
 const GEMINI_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -562,8 +564,10 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (error) {
-        // Gemini failed (rate limit, outage, bad key) — silently fall through
-        // to the free keyword engine so the user always gets results.
+        // Gemini failed (rate limit, outage, bad key) — fall through to the
+        // free keyword engine so the user always gets results, but remember
+        // the real reason so the UI can report exactly what went wrong.
+        lastGeminiError = error instanceof Error ? error.message : String(error);
         console.error('Gemini failed, falling back to keyword engine:', error);
         noteGeminiFailure();
       }
@@ -606,7 +610,10 @@ export async function POST(request: NextRequest) {
       recommendations = aiDatabase.filter((tool) => tool.category === 'General Purpose').slice(0, 5);
     }
 
-    return NextResponse.json({ recommendations, source: 'keyword' }, { headers: securityHeaders });
+    return NextResponse.json(
+      { recommendations, source: 'keyword', geminiError: lastGeminiError ?? undefined, hasGeminiKey: !!process.env.GEMINI_API_KEY },
+      { headers: securityHeaders }
+    );
   } catch (error) {
     console.error('Error getting recommendations:', error);
     return NextResponse.json(

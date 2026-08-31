@@ -690,6 +690,7 @@ export default function Home() {
   const [staticSuggestions, setStaticSuggestions] = useState<AIModel[]>(getSuggestions("All"));
   const [searchError, setSearchError] = useState<string | null>(null);
   const [resultSource, setResultSource] = useState<"gemini" | "keyword" | null>(null);
+  const [geminiError, setGeminiError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   // Budget filter: 'any' | 'free' | '10' | '20' | '50'
   const [budget, setBudget] = useState<string>('any');
@@ -755,6 +756,7 @@ export default function Home() {
       if (requestId !== latestRequestRef.current) return null; // stale, discard
       setSearchError(null);
       setResultSource(data.source === 'gemini' ? 'gemini' : data.source === 'keyword' ? 'keyword' : null);
+      setGeminiError(data.geminiError || null);
       return data.recommendations || [];
     } catch (error) {
       console.error('Error getting recommendations:', error);
@@ -1017,9 +1019,10 @@ export default function Home() {
                   </span>
                 )}
                 {resultSource === 'keyword' && useAi && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    Gemini unavailable right now — used built-in matching
-                  </span>
+                  <div className="text-xs text-amber-600 dark:text-amber-400">
+                    <p>Gemini unavailable right now — used built-in matching</p>
+                    {geminiError && <p className="mt-0.5 font-mono text-amber-500">{geminiError}</p>}
+                  </div>
                 )}
               </div>
               <PriceChart tools={visibleRecs.slice(0, displayCount)} />

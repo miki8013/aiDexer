@@ -478,7 +478,7 @@ export const aiDatabase: AIModel[] = [
     pricing: "Free",
     access: "Web",
     description: "AI search engine specifically designed for developers and programming questions.",
-    url: "https://www.phind.com",
+    url: "https://www.phindai.org",
   },
   {
     name: "You.com",

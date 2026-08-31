@@ -703,6 +703,8 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
   // Budget filter: 'any' | 'free' | '10' | '20' | '50'
   const [budget, setBudget] = useState<string>('any');
+  // Mobile: whether the Filters panel (category + budget) is expanded in the sticky bar
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Restore saved theme on mount; if the user never chose, follow their OS
   useEffect(() => {
@@ -879,6 +881,8 @@ export default function Home() {
       <GridCanvas dark={darkMode} />
       <SiteNav />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-4 pb-8 sm:pb-16">
+        {!hasSearched ? (
+        <>
         {/* Header */}
         <header className="mb-10 sm:mb-16">
           <h1 className="flex items-center gap-2.5 text-4xl sm:text-5xl font-black text-neutral-900 dark:text-neutral-50 mb-2 sm:mb-4 tracking-tight">
@@ -1003,6 +1007,89 @@ export default function Home() {
             </div>
           </form>
         </div>
+        </>
+        ) : (
+          <div className="sticky top-0 z-30 -mx-4 mb-6 sm:-mx-6 sm:mb-8">
+            <div className="border-b border-neutral-200/80 dark:border-neutral-800/80 bg-white/90 dark:bg-neutral-900/90 backdrop-blur">
+              {/* Row 1: compact query + Search + mobile Filters toggle */}
+              <form onSubmit={handleSearch} className="flex items-center gap-2 px-4 sm:px-6 py-2.5">
+                <label htmlFor="main-search" className="sr-only">What do you want to do?</label>
+                <input
+                  id="main-search"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value.slice(0, MAX_QUERY_LENGTH))}
+                  placeholder="Describe what you want to do…"
+                  maxLength={MAX_QUERY_LENGTH}
+                  className="flex-1 min-w-0 px-3 py-2 text-sm sm:text-base font-medium text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-0 outline-none transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="shrink-0 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (useAi ? 'Asking…' : 'Searching…') : 'Search'}
+                </button>
+                {/* Mobile-only: toggle the category/budget panel */}
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen((o) => !o)}
+                  aria-expanded={filtersOpen}
+                  className="shrink-0 md:hidden px-3 py-2 text-sm font-medium rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                >
+                  {filtersOpen ? 'Close' : 'Filters'}
+                </button>
+              </form>
+              {/* Row 2: category + budget + AI mode. Always inline on md+, expandable behind Filters on mobile. */}
+              <div className={`${filtersOpen ? 'block' : 'hidden md:block'}`}>
+                <div className="px-4 sm:px-6 pb-3 flex flex-wrap items-center gap-x-2 gap-y-2">
+                  <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Category</span>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => handleCategoryClick(cat)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                        selectedCategory === cat
+                          ? "bg-neutral-900 text-white"
+                          : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                  <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Budget</span>
+                  {BUDGET_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setBudget(opt.value)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                        budget === opt.value
+                          ? "bg-neutral-900 text-white"
+                          : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={useAi}
+                    onClick={() => setUseAi((prev) => !prev)}
+                    className="ml-auto flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400"
+                  >
+                    <span>AI Mode</span>
+                    <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAi ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${useAi ? 'translate-x-5 bg-white dark:bg-neutral-900' : 'translate-x-1 bg-white'}`} />
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Results Section */}
         {hasSearched ? (

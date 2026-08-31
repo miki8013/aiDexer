@@ -326,6 +326,42 @@ function scoreTool(queryTokens: string[], category: string | null, entry: (typeo
 const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-flash-latest'];
 let geminiModelIndex = 0;
 
+// Models reachable on the account, fetched live from Google's model list so
+// we only ever try models the key can actually use. Cached for 10 minutes.
+let availableModels: string[] | null = null;
+let availableModelsFetchedAt = 0;
+const AVAILABLE_MODELS_TTL = 10 * 60 * 1000;
+
+async function getAvailableModels(apiKey: string): Promise<string[]> {
+  if (availableModels && Date.now() - availableModelsFetchedAt < AVAILABLE_MODELS_TTL) {
+    return availableModels;
+  }
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=100&key=${encodeURIComponent(apiKey)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) throw new Error(`model list HTTP ${res.status}`);
+    const data = (await res.json()) as {
+      models?: { name?: string; supportedGenerationMethods?: string[] }[];
+    };
+    availableModels = (data.models ?? [])
+      .map((m) => (m.name ?? '').replace(/^models\//, ''))
+      .filter(
+        (name) =>
+          name.startsWith('gemini') &&
+          !/tts|image|embedding|audio|omni|native/i.test(name) &&
+          // text generation only
+          name.length > 0
+      );
+    availableModelsFetchedAt = Date.now();
+  } catch {
+    // Can't fetch the list (network blip) — fall back to the static candidates
+    availableModels = null;
+  }
+  return availableModels ?? GEMINI_MODELS;
+}
+
 // Circuit breaker: if Gemini keeps failing (dead key, outage, rate limits),
 // skip it entirely for a cooldown period so the API stays fast.
 let geminiFailures = 0;
@@ -392,9 +428,17 @@ Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,
 
   const constraintLine = constraintsSummary(constraints);
   let lastError: unknown = null;
+  // Discover which models the account can actually reach, then rotate through
+  // them: preferred static candidates first (fast/cheap models), then the rest.
+  const reachable = await getAvailableModels(apiKey);
+  const candidates = [
+    ...GEMINI_MODELS.filter((m) => reachable.includes(m)),
+    ...reachable.filter((m) => !GEMINI_MODELS.includes(m)),
+  ];
+  const models = candidates.length > 0 ? candidates : GEMINI_MODELS;
   // Try each candidate model, remembering which one worked
-  for (let attempt = 0; attempt < GEMINI_MODELS.length; attempt++) {
-    const model = GEMINI_MODELS[(geminiModelIndex + attempt) % GEMINI_MODELS.length];
+  for (let attempt = 0; attempt < models.length; attempt++) {
+    const model = models[(geminiModelIndex + attempt) % models.length];
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     try {
@@ -417,7 +461,7 @@ Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,
       }
 
       // This model works — remember it and reset the failure counter
-      geminiModelIndex = GEMINI_MODELS.indexOf(model);
+      geminiModelIndex = models.indexOf(model);
       geminiFailures = 0;
 
       const data = await res.json();

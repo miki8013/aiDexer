@@ -246,7 +246,25 @@ export default function SiteNav() {
       )}
 
       {/* ---------- Desktop (sm+): pill nav ---------- */}
-      <div className="hidden sm:flex items-center justify-center gap-2 rounded-full border border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur px-2 py-1.5 shadow-sm mx-auto w-fit">
+      <div className="hidden sm:flex items-center justify-center gap-1 sm:gap-2 rounded-full border border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur px-2 py-1.5 shadow-sm mx-auto w-fit">
+        {links.map(({ href, label }) => {
+          const active = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                active
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                  : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-neutral-800"
+              }`}
+            >
+              {label}
+            </Link>
+          );
+        })}
+
         {/* Shortlist popover */}
         <div className="relative" data-shortlist-root>
           <button

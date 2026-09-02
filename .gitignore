@@ -40,3 +40,4 @@ next-env.d.ts
 check-*.png
 check-*.cjs
 shot-*.png
+build-log.txt

@@ -19,7 +19,7 @@ export default function SiteNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [dark, setDark] = useState(false);
-  const [menuOpen, setMenuOpen] = useState<false | "shortlist" | "account">(false);
+  const [menuOpen, setMenuOpen] = useState<false | "shortlist" | "account" | "mobile">(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, ready } = useSessionUser();
   const { bookmarks, toggle } = useBookmarks();
@@ -62,25 +62,142 @@ export default function SiteNav() {
   };
 
   return (
-    <nav className="relative z-40 flex justify-center px-4 pt-3 pb-2">
-      <div className="flex items-center gap-1 sm:gap-2 rounded-full border border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur px-2 py-1.5 shadow-sm">
-        {links.map(({ href, label }) => {
-          const active = pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-                active
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                  : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-neutral-800"
-              }`}
-            >
-              {label}
-            </Link>
-          );
-        })}
+    <nav className="relative z-40 px-3 sm:px-4 pt-3 pb-2">
+      {/* ---------- Mobile (< sm): compact bar + hamburger dropdown ---------- */}
+      <div className="flex sm:hidden items-center justify-between rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/90 backdrop-blur px-3 py-2 shadow-sm">
+        <Link href="/" className="font-black tracking-tight text-sm">
+          aiDexer
+        </Link>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            aria-label="Toggle dark mode"
+            onClick={toggleTheme}
+            className="p-2 rounded-full text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-colors"
+          >
+            {dark ? (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+              </svg>
+            ) : (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            aria-label="Open menu"
+            aria-expanded={menuOpen === "mobile"}
+            onClick={() => setMenuOpen((o) => (o === "mobile" ? false : "mobile"))}
+            className="p-2 rounded-full text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-colors"
+          >
+            {menuOpen === "mobile" ? (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            ) : (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {menuOpen === "mobile" && (
+        <div className="sm:hidden mt-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg p-3">
+          <ul className="space-y-0.5">
+            {links.map(({ href, label }) => {
+              const active = pathname === href;
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    onClick={() => setMenuOpen(false)}
+                    aria-current={active ? "page" : undefined}
+                    className={`block px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                        : "text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Shortlist section */}
+          <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+            <p className="px-3 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+              &#9733; Shortlist{bookmarks.length > 0 ? ` (${bookmarks.length})` : ""}
+            </p>
+            {bookmarks.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
+                Nothing saved yet. Tap Save on any tool.
+              </p>
+            ) : (
+              <ul className="mt-1">
+                {bookmarks.map((name) => (
+                  <li key={name} className="flex items-center justify-between gap-2">
+                    <Link
+                      href={`/tools/${slugify(name)}`}
+                      onClick={() => setMenuOpen(false)}
+                      className="px-3 py-2 text-sm font-medium truncate hover:underline"
+                    >
+                      {name}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => toggle(name)}
+                      aria-label={`Remove ${name} from shortlist`}
+                      className="p-2 text-neutral-400 hover:text-red-500 transition-colors shrink-0"
+                    >
+                      &#10005;
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="px-3 pt-1 text-xs text-neutral-400 dark:text-neutral-500">
+              {user ? "Synced to your account." : "Saved on this device \u2014 sign in to sync."}
+            </p>
+          </div>
+
+          {/* Account section */}
+          <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+            {!ready ? null : user ? (
+              <>
+                <p className="px-3 text-sm font-semibold truncate">{user.name || user.email}</p>
+                <p className="px-3 pb-2 text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                  {user.email}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/signin"
+                onClick={() => setMenuOpen(false)}
+                className="block text-center px-3 py-2.5 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-sm font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
+              >
+                Sign in to sync everywhere
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ---------- Desktop (sm+): pill nav ---------- */}
+      <div className="hidden sm:flex items-center justify-center gap-2 rounded-full border border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur px-2 py-1.5 shadow-sm mx-auto w-fit">
         {/* Shortlist popover */}
         <div className="relative" data-shortlist-root>
           <button

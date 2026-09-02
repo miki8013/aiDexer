@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS "account" (
   "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   "accountId" TEXT NOT NULL,
   "providerId" TEXT NOT NULL,
+  "issuer" TEXT,
+  "audience" TEXT,
   "accessToken" TEXT,
   "refreshToken" TEXT,
   "idToken" TEXT,
@@ -43,6 +45,10 @@ CREATE TABLE IF NOT EXISTS "account" (
   "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
   "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
 );
+
+-- Newer better-auth versions write issuer/audience on account rows.
+ALTER TABLE "account" ADD COLUMN IF NOT EXISTS "issuer" TEXT;
+ALTER TABLE "account" ADD COLUMN IF NOT EXISTS "audience" TEXT;
 
 CREATE TABLE IF NOT EXISTS "verification" (
   id TEXT PRIMARY KEY,

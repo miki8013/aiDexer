@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -94,7 +94,7 @@ export default function SiteNav() {
                 : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-neutral-800"
             }`}
           >
-            â˜… Shortlist{bookmarks.length > 0 ? ` (${bookmarks.length})` : ""}
+            &#9733; Shortlist{bookmarks.length > 0 ? ` (${bookmarks.length})` : ""}
           </button>
           {menuOpen === "shortlist" && (
             <div className="absolute right-0 top-full mt-2 w-72 max-w-[85vw] rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg p-3">
@@ -103,7 +103,7 @@ export default function SiteNav() {
               </p>
               {bookmarks.length === 0 ? (
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  Nothing saved yet. Tap â˜… Save on any tool.
+                  Nothing saved yet. Tap &#9733; Save on any tool.
                 </p>
               ) : (
                 <ul className="space-y-1 max-h-64 overflow-y-auto">
@@ -122,7 +122,7 @@ export default function SiteNav() {
                         aria-label={`Remove ${name} from shortlist`}
                         className="text-neutral-400 hover:text-red-500 transition-colors shrink-0"
                       >
-                        âœ•
+                        &#10005;
                       </button>
                     </li>
                   ))}
@@ -131,7 +131,7 @@ export default function SiteNav() {
               <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
                 {user
                   ? "Synced to your account."
-                  : "Saved on this device â€” sign in to sync everywhere."}
+                  : "Saved on this device \u2014 sign in to sync everywhere."}
               </p>
             </div>
           )}

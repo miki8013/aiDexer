@@ -1,24 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBookmarks } from "@/lib/hooks";
 
 const FLAG_REASONS = ["Pricing changed", "Tool discontinued", "Wrong info", "Link broken"];
 
+const voteCache = new Map<string, number>();
+
 /**
  * Client-side actions on the tool detail page:
- *  - "I use this" upvote counter (community social proof)
+ *  - "I use this" vote — optimistic, reversible (identical to the homepage card)
  *  - Bookmark / shortlist toggle
  *  - "Flag outdated info" crowdsourced report form
  */
 export default function ToolActions({ toolName }: { toolName: string }) {
   const { bookmarks, toggle } = useBookmarks();
-  const [count, setCount] = useState<number | null>(null);
+  const [count, setCount] = useState<number | null>(voteCache.get(toolName) ?? null);
   const [voted, setVoted] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
   const [reason, setReason] = useState(FLAG_REASONS[0]);
   const [note, setNote] = useState("");
   const [flagState, setFlagState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const seqRef = useRef(0);
 
   useEffect(() => {
     try {
@@ -26,27 +29,45 @@ export default function ToolActions({ toolName }: { toolName: string }) {
     } catch {}
     fetch(`/api/vote?tool=${encodeURIComponent(toolName)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => typeof d?.count === "number" && setCount(d.count))
+      .then((d) => {
+        if (typeof d?.count === "number") {
+          voteCache.set(toolName, d.count);
+          setCount(d.count);
+        }
+      })
       .catch(() => {});
   }, [toolName]);
 
-  const handleVote = async () => {
-    if (voted) return;
+  // Optimistic, race-safe, reversible — same pattern as ToolCardExtras.
+  const handleVote = () => {
+    const seq = ++seqRef.current;
+    const nextVoted = !voted;
+    const delta = nextVoted ? 1 : -1;
+    // 1. Flip the UI instantly.
+    setVoted(nextVoted);
+    setCount((c) => Math.max(0, (c ?? 0) + delta));
     try {
-      const res = await fetch("/api/vote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tool: toolName, action: "use" }),
-      });
-      if (res.ok) {
-        const d = await res.json();
-        setCount(d.count);
-        setVoted(true);
-        try {
-          localStorage.setItem(`aidexer:voted:${toolName}`, "1");
-        } catch {}
-      }
+      if (nextVoted) localStorage.setItem(`aidexer:voted:${toolName}`, "1");
+      else localStorage.removeItem(`aidexer:voted:${toolName}`);
     } catch {}
+    // 2. Sync in the background; revert on failure or stale response.
+    fetch("/api/vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool: toolName, action: nextVoted ? "use" : "unuse" }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        if (seqRef.current !== seq) return; // a newer tap already won
+        voteCache.set(toolName, d.count);
+        setCount(d.count);
+        setVoted(!!d.voted);
+      })
+      .catch(() => {
+        if (seqRef.current !== seq) return;
+        setVoted(!nextVoted);
+        setCount((c) => Math.max(0, (c ?? 0) - delta));
+      });
   };
 
   const handleFlag = async (e: React.FormEvent) => {
@@ -79,14 +100,16 @@ export default function ToolActions({ toolName }: { toolName: string }) {
         <button
           type="button"
           onClick={handleVote}
-          disabled={voted}
+          aria-pressed={voted}
+          aria-label={voted ? `Retract "I use ${toolName}"` : `I use ${toolName}`}
           className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
             voted
-              ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40"
+              ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:border-emerald-600"
               : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-500"
           }`}
         >
-          ♥ I use this{count !== null && count > 0 ? ` · ${count}` : ""}
+          &#9829; I use this{voted ? " \u2713" : ""}
+          {count !== null && count > 0 ? ` \u00b7 ${count}` : ""}
         </button>
 
         <button
@@ -99,7 +122,7 @@ export default function ToolActions({ toolName }: { toolName: string }) {
               : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-500"
           }`}
         >
-          ★ {bookmarked ? "Saved to shortlist" : "Save to shortlist"}
+          &#9733; {bookmarked ? "Saved to shortlist" : "Save to shortlist"}
         </button>
 
         <button
@@ -108,7 +131,7 @@ export default function ToolActions({ toolName }: { toolName: string }) {
           aria-expanded={flagOpen}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
         >
-          ⚑ Flag outdated info
+          &#9873; Flag outdated info
         </button>
       </div>
 

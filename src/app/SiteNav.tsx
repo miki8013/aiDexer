@@ -20,6 +20,7 @@ export default function SiteNav() {
   const router = useRouter();
   const [dark, setDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState<false | "shortlist" | "account" | "mobile">(false);
+  const [shortlistOpen, setShortlistOpen] = useState(false); // mobile shortlist expanded
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, ready } = useSessionUser();
   const { bookmarks, toggle } = useBookmarks();
@@ -29,12 +30,21 @@ export default function SiteNav() {
     setDark(document.documentElement.classList.contains("dark"));
   }, []);
 
+  // Collapse the mobile shortlist whenever the mobile menu closes
+  useEffect(() => {
+    if (menuOpen !== "mobile") setShortlistOpen(false);
+  }, [menuOpen]);
+
   // Close menus on outside click / Escape
   useEffect(() => {
     if (!menuOpen) return;
     const onClick = (e: MouseEvent) => {
-      const inMenu = menuRef.current?.contains(e.target as Node);
-      const onShortlist = (e.target as HTMLElement)?.closest?.("[data-shortlist-root]");
+      const target = e.target as HTMLElement;
+      // Clicks anywhere inside the mobile bar/dropdown never auto-close it —
+      // the X button, links, and remove buttons handle their own closing.
+      if (menuOpen === "mobile" && target.closest?.("[data-mobile-root]")) return;
+      const inMenu = menuRef.current?.contains(target);
+      const onShortlist = target.closest?.("[data-shortlist-root]");
       if (!inMenu && !onShortlist) setMenuOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
@@ -64,7 +74,7 @@ export default function SiteNav() {
   return (
     <nav className="relative z-40 px-3 sm:px-4 pt-3 pb-2">
       {/* ---------- Mobile (< sm): compact bar + hamburger dropdown ---------- */}
-      <div className="flex sm:hidden items-center justify-between rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/90 backdrop-blur px-3 py-2 shadow-sm">
+      <div data-mobile-root className="flex sm:hidden items-center justify-between rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/90 backdrop-blur px-3 py-2 shadow-sm">
         <Link href="/" className="font-black tracking-tight text-sm">
           aiDexer
         </Link>
@@ -107,7 +117,7 @@ export default function SiteNav() {
       </div>
 
       {menuOpen === "mobile" && (
-        <div className="sm:hidden mt-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg p-3">
+        <div data-mobile-root className="sm:hidden mt-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg p-3">
           <ul className="space-y-0.5">
             {links.map(({ href, label }) => {
               const active = pathname === href;
@@ -130,41 +140,77 @@ export default function SiteNav() {
             })}
           </ul>
 
-          {/* Shortlist section */}
+          {/* Shortlist section — collapsed until tapped */}
           <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-            <p className="px-3 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
-              &#9733; Shortlist{bookmarks.length > 0 ? ` (${bookmarks.length})` : ""}
-            </p>
-            {bookmarks.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
-                Nothing saved yet. Tap Save on any tool.
-              </p>
-            ) : (
-              <ul className="mt-1">
-                {bookmarks.map((name) => (
-                  <li key={name} className="flex items-center justify-between gap-2">
-                    <Link
-                      href={`/tools/${slugify(name)}`}
-                      onClick={() => setMenuOpen(false)}
-                      className="px-3 py-2 text-sm font-medium truncate hover:underline"
-                    >
-                      {name}
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => toggle(name)}
-                      aria-label={`Remove ${name} from shortlist`}
-                      className="p-2 text-neutral-400 hover:text-red-500 transition-colors shrink-0"
-                    >
-                      &#10005;
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            <button
+              type="button"
+              aria-expanded={shortlistOpen}
+              onClick={() => setShortlistOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <span>
+                &#9733; Shortlist{bookmarks.length > 0 ? ` (${bookmarks.length})` : ""}
+              </span>
+              <span
+                className={`text-xs text-neutral-400 transition-transform ${shortlistOpen ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              >
+                &#9662;
+              </span>
+            </button>
+
+            {shortlistOpen && (
+              <div className="pb-1">
+                {bookmarks.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
+                    Nothing saved yet. Tap Save on any tool.
+                  </p>
+                ) : (
+                  <ul className="mt-0.5">
+                    {bookmarks.map((name) => (
+                      <li key={name} className="flex items-center justify-between gap-1">
+                        <Link
+                          href={`/?q=${encodeURIComponent(name)}&ai=1`}
+                          onClick={() => setMenuOpen(false)}
+                          className="flex-1 min-w-0 px-3 py-2 text-sm font-medium truncate hover:underline"
+                          title={`Open ${name} in AI Mode`}
+                        >
+                          {name}
+                        </Link>
+                        <Link
+                          href={`/tools/${slugify(name)}`}
+                          onClick={() => setMenuOpen(false)}
+                          aria-label={`${name} details`}
+                          className="p-2 text-xs text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors shrink-0"
+                        >
+                          info
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => toggle(name)}
+                          aria-label={`Remove ${name} from shortlist`}
+                          className="p-2 text-neutral-400 hover:text-red-500 transition-colors shrink-0"
+                        >
+                          &#10005;
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {bookmarks.length > 0 && (
+                  <Link
+                    href={`/?q=${encodeURIComponent(bookmarks.join(" vs "))}&ai=1`}
+                    onClick={() => setMenuOpen(false)}
+                    className="block mx-3 mt-1 px-3 py-2 rounded-full text-center text-sm font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
+                  >
+                    Compare saved in AI Mode
+                  </Link>
+                )}
+                <p className="px-3 pt-2 text-xs text-neutral-400 dark:text-neutral-500">
+                  {user ? "Synced to your account." : "Saved on this device \u2014 sign in to sync."}
+                </p>
+              </div>
             )}
-            <p className="px-3 pt-1 text-xs text-neutral-400 dark:text-neutral-500">
-              {user ? "Synced to your account." : "Saved on this device \u2014 sign in to sync."}
-            </p>
           </div>
 
           {/* Account section */}

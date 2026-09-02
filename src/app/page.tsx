@@ -718,6 +718,19 @@ export default function Home() {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
+  // Deep-link support: /?q=ChatGPT&ai=1 pre-fills and runs an AI-mode search.
+  // Used by shortlist links ("compare in AI Mode") and share cards.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    if (!q || !q.trim()) return;
+    if (params.get("ai") === "1") setUseAi(true);
+    setSearchQuery(q);
+    runSearch(q);
+    // Run once on mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Refs for stale-request discarding
   const latestRequestRef = useRef(0);
 

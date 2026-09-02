@@ -2,7 +2,7 @@ import { aiDatabase, type AIModel } from "../app/api/recommend/aiDatabase";
 
 export type { AIModel };
 
-/** URL-safe slug for a tool name, e.g. "ChatGPT (GPT-4)" -> "chatgpt-gpt-4". */
+/** URL-safe slug for a tool name, e.g. "ChatGPT (OpenAI)" -> "chatgpt-openai". */
 export function slugify(name: string): string {
   return name
     .toLowerCase()

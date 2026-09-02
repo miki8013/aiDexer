@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function EmbedDocsPage() {
   const exampleCode = `<iframe
-  src="https://YOUR-DOMAIN/embed/compare?tools=chatgpt-gpt-4,claude-anthropic"
+  src="https://YOUR-DOMAIN/embed/compare?tools=chatgpt-openai,claude-anthropic"
   width="100%" height="480" style="border:0;border-radius:12px"
   loading="lazy" title="Compare AI tools — aiDexer">
 </iframe>`;
@@ -29,7 +29,7 @@ export default function EmbedDocsPage() {
         <ol className="list-decimal list-inside space-y-1.5 text-sm text-neutral-700 dark:text-neutral-300 mb-6">
           <li>
             Pick two (or three) tools and find their slugs on their detail pages, e.g.{" "}
-            <Link href="/tools/chatgpt-gpt-4" className="underline">/tools/chatgpt-gpt-4</Link>.
+            <Link href="/tools/chatgpt-openai" className="underline">/tools/chatgpt-openai</Link>.
           </li>
           <li>Build the embed URL: <code className="text-xs bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">/embed/compare?tools=&lt;slug-a&gt;,&lt;slug-b&gt;</code></li>
           <li>Drop it into an iframe on your site:</li>
@@ -40,7 +40,7 @@ export default function EmbedDocsPage() {
         </pre>
 
         <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
-          <a href="/embed/compare?tools=chatgpt-gpt-4,claude-anthropic" className="underline">
+          <a href="/embed/compare?tools=chatgpt-openai,claude-anthropic" className="underline">
             See a live example →
           </a>
         </p>

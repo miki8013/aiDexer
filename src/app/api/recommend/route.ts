@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { aiDatabase, type AIModel } from './aiDatabase';
-import { getAllTools } from '@/lib/toolsDb';
+import { getAllTools, getToolByName } from '@/lib/toolsDb';
 import { getUserSignals, type UserSignals } from '@/lib/serverStore';
 
 // Security headers for all responses
@@ -445,6 +445,24 @@ function setCachedGemini(key: string, tools: AIModel[]): void {
  * from a fixed list. Returns normalized tool objects with live data.
  * Throws on failure so the caller can fall back to keyword scoring.
  */
+/**
+ * Resolve a trustworthy external link for a Gemini-suggested tool. Gemini
+ * sometimes returns an empty or relative url — clicking href="" just reloads
+ * our own page. Fall back to our directory (DB, then static list), and
+ * finally to a Google search for the tool's official site.
+ */
+async function resolveToolUrl(name: string, rawUrl: unknown): Promise<string> {
+  const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+  if (/^https?:\/\//i.test(url)) return url;
+  const known =
+    (await getToolByName(name)) ??
+    aiDatabase.find((x) => x.name.toLowerCase() === name.toLowerCase());
+  return (
+    known?.url ??
+    `https://www.google.com/search?q=${encodeURIComponent(name + ' AI tool official website')}`
+  );
+}
+
 async function getGeminiRecommendations(
   query: string,
   category: string | null,
@@ -546,7 +564,7 @@ Base pricing and descriptions on what the tool currently offers as of your lates
           strengths: Array.isArray(t.strengths)
             ? t.strengths.filter((x): x is string => typeof x === 'string').slice(0, 5)
             : [],
-                              url: typeof t.url === 'string' ? t.url.trim() : '',
+          url: await resolveToolUrl(name, t.url),
         });
       }
 

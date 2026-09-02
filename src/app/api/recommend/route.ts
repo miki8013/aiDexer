@@ -417,75 +417,76 @@ const GEMINI_MAX_FAILURES = 2;
 const GEMINI_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
 // Cache Gemini answers for repeated/identical queries to conserve tokens
-const geminiCache = new Map<string, { indices: number[]; expires: number }>();
+const geminiCache = new Map<string, { tools: AIModel[]; expires: number }>();
 const GEMINI_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 const GEMINI_CACHE_MAX = 100;
 
-function getCachedGemini(key: string): number[] | null {
+function getCachedGemini(key: string): AIModel[] | null {
   const entry = geminiCache.get(key);
   if (!entry) return null;
   if (Date.now() > entry.expires) {
     geminiCache.delete(key);
     return null;
   }
-  return entry.indices;
+  return entry.tools;
 }
 
-function setCachedGemini(key: string, indices: number[]): void {
+function setCachedGemini(key: string, tools: AIModel[]): void {
   if (geminiCache.size >= GEMINI_CACHE_MAX) {
     const oldest = geminiCache.keys().next().value;
     if (oldest !== undefined) geminiCache.delete(oldest);
   }
-  geminiCache.set(key, { indices, expires: Date.now() + GEMINI_CACHE_TTL });
+  geminiCache.set(key, { tools, expires: Date.now() + GEMINI_CACHE_TTL });
 }
 
 /**
- * Ask Gemini to pick the most relevant tools from the provided list.
- * Returns 1-based indices into the tool list, best match first.
+ * Ask Gemini (with Google Search grounding) to find real, current AI tools
+ * matching the user's query — searching the live web rather than picking
+ * from a fixed list. Returns normalized tool objects with live data.
  * Throws on failure so the caller can fall back to keyword scoring.
  */
 async function getGeminiRecommendations(
-  tools: AIModel[],
   query: string,
   category: string | null,
   constraints: Constraints,
   profile: string | null = null
-): Promise<number[]> {
+): Promise<AIModel[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return [];
   if (Date.now() < geminiDisabledUntil) {
     throw new Error('Gemini temporarily disabled (circuit breaker open)');
   }
 
-  // Serve repeated queries from cache — saves tokens and latency
-  const cacheKey = `${query.toLowerCase()}|${category ?? ''}|${profile ?? ''}|${JSON.stringify(constraints)}`;
-  const cached = getCachedGemini(cacheKey);
-  if (cached) return cached;
-
-  // Built from the (possibly DB-loaded) tool list for this request
-  const GEMINI_TOOL_LIST = tools
-    .map((tool, i) => `${i + 1}. ${tool.name} — ${tool.bestFor.slice(0, 3).join(', ')}`)
-    .join('\n');
-
-  const systemPrompt = `You recommend AI tools. Pick the best matches from this numbered list:
-
-${GEMINI_TOOL_LIST}
-
-Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,1]. No other text.`;
-
-  const userPrompt = `User query: "${query}"${category ? `\nPreferred category: ${category}` : ''}${profile ? `\nUser context (who they are, tailor picks accordingly): ${profile}` : ''}`;
-
   const constraintLine = constraintsSummary(constraints);
+  const prompt = `
+You are an AI tool researcher. Search the live web for the best AI tools that match this request, then return ONLY a JSON array (no code block, no extra text) of up to 8 tool objects:
+
+User query: "${query}"
+${category ? `Preferred category: ${category}` : ''}
+${profile ? `User context (tailor picks accordingly): ${profile}` : ''}
+${constraintLine ? `IMPORTANT requirements: ${constraintLine}` : ''}
+
+Each object must have these exact fields:
+- "name": the tool's product name
+- "description": a 1-2 sentence summary of what it does
+- "category": the most fitting category from: Image Generation, Video Generation, Audio/Music, Coding, Writing, Research & Chat, Productivity, Business, Education, Analytics, Developer Tools, Marketing, Design, or General Purpose
+- "pricing": a string like "Free, $20/mo", "From $10/mo", "$249 one-time", "Custom", or "Unknown"
+- "access": a short string like "Web app", "API", "Self-hosted", "Mobile app", "VS Code extension" — pick the primary access method
+- "bestFor": a JSON array of 2-3 short strings (e.g. ["logo design", "social media", "print"]) describing what it's best for
+- "strengths": a JSON array of 2-3 short strings describing key strengths/advantages
+
+Base pricing and descriptions on what the tool currently offers as of your latest web search. If you can't find current pricing, use "Unknown".
+`.trim();
+
   let lastError: unknown = null;
-  // Discover which models the account can actually reach, then rotate through
-  // them: preferred static candidates first (fast/cheap models), then the rest.
+
   const reachable = await getAvailableModels(apiKey);
   const candidates = [
     ...GEMINI_MODELS.filter((m) => reachable.includes(m)),
     ...reachable.filter((m) => !GEMINI_MODELS.includes(m)),
   ];
   const models = candidates.length > 0 ? candidates : GEMINI_MODELS;
-  // Try each candidate model, remembering which one worked
+
   for (let attempt = 0; attempt < models.length; attempt++) {
     const model = models[(geminiModelIndex + attempt) % models.length];
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -494,22 +495,21 @@ Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(20000),
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
           contents: [
-            { role: 'user', parts: [{ text: userPrompt }, ...(constraintLine ? [{ text: `IMPORTANT requirements the user stated: ${constraintLine}` }] : [])] },
+            { role: 'user', parts: [{ text: prompt }] },
           ],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 64 },
+          tools: [{ googleSearch: {} }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
         }),
       });
 
       if (!res.ok) {
         lastError = new Error(`Gemini HTTP ${res.status} for ${model}`);
-        continue; // try next model
+        continue;
       }
 
-      // This model works — remember it and reset the failure counter
       geminiModelIndex = models.indexOf(model);
       geminiFailures = 0;
 
@@ -517,22 +517,52 @@ Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,
       const reply: string =
         data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('') || '';
 
-      // Parse indices from the reply — handles [3,12,1] and stray text around it
-      const match = reply.match(/\[[\d\s,]*\]/);
+      const match = reply.match(/\[[\s\S]*\]/);
       if (!match) return [];
-      const indices = (JSON.parse(match[0]) as number[])
-        .filter((n) => Number.isInteger(n) && n >= 1 && n <= tools.length)
-        // Hard guard: drop any pick that breaks the user's stated budget.
-        .filter((n) => passesBudget(tools[n - 1].pricing, constraints));
-      setCachedGemini(cacheKey, indices);
-      return indices;
+
+      let parsed: unknown[];
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch {
+        return [];
+      }
+
+      const validTools: AIModel[] = [];
+      for (const item of parsed) {
+        if (!item || typeof item !== 'object') continue;
+        const t = item as Record<string, unknown>;
+        const name = typeof t.name === 'string' ? t.name.trim() : '';
+        if (!name) continue;
+
+        validTools.push({
+          name,
+          description: typeof t.description === 'string' ? t.description.trim() : '',
+          category: typeof t.category === 'string' ? t.category.trim() : 'General Purpose',
+          pricing: typeof t.pricing === 'string' ? t.pricing.trim() : 'Unknown',
+          access: typeof t.access === 'string' ? t.access.trim() : 'Web app',
+          bestFor: Array.isArray(t.bestFor)
+            ? t.bestFor.filter((x): x is string => typeof x === 'string').slice(0, 5)
+            : [],
+          strengths: Array.isArray(t.strengths)
+            ? t.strengths.filter((x): x is string => typeof x === 'string').slice(0, 5)
+            : [],
+                              url: typeof t.url === 'string' ? t.url.trim() : '',
+        });
+      }
+
+      setCachedGemini(geminiCacheKey(query, category, profile, constraints), validTools);
+      return validTools.slice(0, 8);
     } catch (error) {
       lastError = error;
-      continue;
     }
   }
 
   throw lastError ?? new Error('All Gemini models failed');
+}
+
+/** Extract a cache key for a Gemini web-search query. */
+function geminiCacheKey(query: string, category: string | null, profile: string | null, constraints: Constraints): string {
+  return `${query.toLowerCase()}|${category ?? ''}|${profile ?? ''}|${JSON.stringify(constraints)}`;
 }
 
 /** Record a Gemini failure and open the breaker after repeated failures. */
@@ -611,15 +641,13 @@ export async function POST(request: NextRequest) {
       tools.filter((t) => likedNames.has(t.name)).map((t) => t.category.toLowerCase())
     );
 
-    // --- AI mode: use Gemini when the toggle is on, free scoring as fallback ---
+    // --- AI mode: use Gemini with Google Search grounding for live web data ---
     if (useAi && process.env.GEMINI_API_KEY) {
       try {
-        const geminiIndices = await getGeminiRecommendations(tools, query, category, constraints, profile);
-        if (geminiIndices.length > 0) {
-          const recommendations = geminiIndices
-            .map((i) => tools[i - 1])
-            .filter((tool): tool is AIModel => tool !== undefined)
-            // Dedupe by name — Gemini occasionally repeats a tool
+        const liveTools = await getGeminiRecommendations(query, category, constraints, profile);
+        if (liveTools.length > 0) {
+          // Dedupe by name - Gemini occasionally repeats a tool
+          const recommendations = liveTools
             .filter((tool, idx, arr) => arr.findIndex((t) => t.name === tool.name) === idx)
             .slice(0, 8);
           if (recommendations.length > 0) {
@@ -630,7 +658,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (error) {
-        // Gemini failed (rate limit, outage, bad key) — fall through to the
+        // Gemini failed (rate limit, outage, bad key) - fall through to the
         // free keyword engine so the user always gets results, but remember
         // the real reason so the UI can report exactly what went wrong.
         lastGeminiError = error instanceof Error ? error.message : String(error);

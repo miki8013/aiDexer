@@ -40,21 +40,24 @@ export default function ToolCardExtras({ toolName }: { toolName: string }) {
   }, [toolName]);
 
   const handleVote = async () => {
-    if (voted || busy) return;
+    if (busy) return;
     setBusy(true);
+    const action = voted ? "unuse" : "use";
     try {
       const res = await fetch("/api/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tool: toolName, action: "use" }),
+        body: JSON.stringify({ tool: toolName, action }),
       });
       if (res.ok) {
         const d = await res.json();
         voteCache.set(toolName, d.count);
         setCount(d.count);
-        setVoted(true);
+        // Trust the server's answer so the state can never drift.
+        setVoted(!!d.voted);
         try {
-          localStorage.setItem(`aidexer:voted:${toolName}`, "1");
+          if (d.voted) localStorage.setItem(`aidexer:voted:${toolName}`, "1");
+          else localStorage.removeItem(`aidexer:voted:${toolName}`);
         } catch {}
       }
     } catch {}
@@ -68,18 +71,19 @@ export default function ToolCardExtras({ toolName }: { toolName: string }) {
       <button
         type="button"
         onClick={handleVote}
-        disabled={voted || busy}
-        aria-label={`I use ${toolName}`}
+        disabled={busy}
+        aria-pressed={voted}
+        aria-label={voted ? `Retract "I use ${toolName}"` : `I use ${toolName}`}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
           voted
-            ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40"
+            ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:border-emerald-600"
             : "border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:border-neutral-500"
-        } disabled:cursor-default`}
+        } disabled:opacity-60`}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill={voted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
-        {voted ? "I use this" : "I use this"}
+        {voted ? "I use this ✓" : "I use this"}
         {count !== null && count > 0 && <span className="tabular-nums">· {count}</span>}
       </button>
 

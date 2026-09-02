@@ -15,12 +15,31 @@ function notConfigured() {
 
 const handler = toNextJsHandler(auth);
 
-export async function GET(...args: Parameters<typeof handler.GET>) {
+// Wrap so a server-side failure is visible in the response body and in the
+// Vercel function logs instead of an empty HTTP 500.
+async function run(
+  fn: (request: Request) => Promise<Response>,
+  request: Request
+): Promise<Response> {
   if (!process.env.DATABASE_URL) return notConfigured();
-  return handler.GET(...args);
+  try {
+    return await fn(request);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[auth] handler error:", err);
+    return NextResponse.json(
+      { error: "Auth request failed.", detail: message },
+      { status: 500, headers: securityHeaders }
+    );
+  }
 }
 
-export async function POST(...args: Parameters<typeof handler.POST>) {
-  if (!process.env.DATABASE_URL) return notConfigured();
-  return handler.POST(...args);
+export async function GET(request: Request) {
+  return run(handler.GET, request);
 }
+
+export async function POST(request: Request) {
+  return run(handler.POST, request);
+}
+
+

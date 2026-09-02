@@ -18,10 +18,12 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setBusy(true);
     try {
       const res =
@@ -30,14 +32,27 @@ export default function SignInPage() {
           : await authClient.signIn.email({ email, password });
       if (res.error) {
         setError(res.error.message ?? "Something went wrong. Try again.");
+        setBusy(false);
       } else {
-        router.push("/");
-        router.refresh();
+        // Clear the password immediately and show a clear confirmation instead
+        // of a blink-and-you-miss-it redirect.
+        setPassword("");
+        setSuccess(
+          mode === "signup"
+            ? "Account created! Taking you back to the homepage…"
+            : "Signed in! Taking you back to the homepage…"
+        );
+        // Give shortlist/profile sync hooks a moment to merge guest data,
+        // then navigate.
+        setTimeout(() => {
+          router.push("/");
+          router.refresh();
+        }, 1200);
       }
     } catch {
-      setError("Network error — is the server configured for auth?");
+      setError("Network error — please check your connection and try again.");
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   return (
@@ -98,7 +113,16 @@ export default function SignInPage() {
             />
           </div>
 
-          {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+          {error && (
+            <p role="alert" className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+          {success && (
+            <p role="status" className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2">
+              {success}
+            </p>
+          )}
 
           <button
             type="submit"

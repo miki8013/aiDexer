@@ -66,6 +66,9 @@ export default function SiteNav() {
   };
 
   const handleSignOut = async () => {
+    if (!window.confirm("Sign out? Your shortlist stays saved on this device and will sync again next time you sign in.")) {
+      return;
+    }
     await authClient.signOut();
     setMenuOpen(false);
     router.refresh();

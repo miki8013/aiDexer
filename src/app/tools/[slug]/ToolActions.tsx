@@ -51,6 +51,13 @@ export default function ToolActions({ toolName }: { toolName: string }) {
 
   const handleFlag = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (
+      !window.confirm(
+        `Submit this report for ${toolName}? Our team reviews flagged info before updating listings.`
+      )
+    ) {
+      return;
+    }
     setFlagState("sending");
     try {
       const res = await fetch("/api/flag", {

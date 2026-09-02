@@ -54,7 +54,8 @@ export async function getVotes(): Promise<VoteCounts> {
 
 /**
  * Record a "I use this" vote. Deduplicated per voter (user id when signed in,
- * otherwise a coarse IP key). Returns the new total for the tool.
+ * otherwise a coarse IP key). Idempotent — re-voting doesn't double-count.
+ * Returns the new total for the tool.
  */
 export async function addVote(
   tool: string,
@@ -82,6 +83,49 @@ export async function addVote(
   votes[tool] = (votes[tool] ?? 0) + 1;
   const ok = await writeJson("votes.json", votes);
   return { ok, count: votes[tool] ?? 0 };
+}
+
+/** Retract a "I use this" vote. Returns the new total for the tool. */
+export async function removeVote(
+  tool: string,
+  voter: string
+): Promise<{ ok: boolean; count: number }> {
+  if (dbEnabled) {
+    try {
+      await query("DELETE FROM vote_events WHERE tool = $1 AND voter = $2", [
+        tool,
+        voter,
+      ]);
+      const rows = await query<{ count: string }>(
+        "SELECT COUNT(*)::text AS count FROM vote_events WHERE tool = $1",
+        [tool]
+      );
+      return { ok: true, count: Number(rows[0]?.count ?? 0) };
+    } catch (err) {
+      console.error("removeVote db error:", err);
+      return { ok: false, count: 0 };
+    }
+  }
+  // Legacy path: decrement, floored at zero.
+  const votes = await getVotes();
+  votes[tool] = Math.max(0, (votes[tool] ?? 0) - 1);
+  const ok = await writeJson("votes.json", votes);
+  return { ok, count: votes[tool] ?? 0 };
+}
+
+/** Whether this voter has already voted for this tool (Postgres only). */
+export async function hasVoted(tool: string, voter: string): Promise<boolean> {
+  if (!dbEnabled) return false;
+  try {
+    const rows = await query<{ exists: boolean }>(
+      "SELECT EXISTS(SELECT 1 FROM vote_events WHERE tool = $1 AND voter = $2)",
+      [tool, voter]
+    );
+    return !!rows[0]?.exists;
+  } catch (err) {
+    console.error("hasVoted db error:", err);
+    return false;
+  }
 }
 
 

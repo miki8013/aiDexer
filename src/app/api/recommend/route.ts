@@ -418,7 +418,7 @@ const GEMINI_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
 // Cache Gemini answers for repeated/identical queries to conserve tokens
 const geminiCache = new Map<string, { tools: AIModel[]; expires: number }>();
-const GEMINI_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const GEMINI_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const GEMINI_CACHE_MAX = 100;
 
 function getCachedGemini(key: string): AIModel[] | null {
@@ -445,22 +445,42 @@ function setCachedGemini(key: string, tools: AIModel[]): void {
  * from a fixed list. Returns normalized tool objects with live data.
  * Throws on failure so the caller can fall back to keyword scoring.
  */
+interface WebChunk { title?: string; uri?: string }
+
 /**
- * Resolve a trustworthy external link for a Gemini-suggested tool. Gemini
- * sometimes returns an empty or relative url — clicking href="" just reloads
- * our own page. Fall back to our directory (DB, then static list), and
- * finally to a Google search for the tool's official site.
+ * Best available link for a suggested tool, in priority order:
+ *  1. an https URL the model itself returned (never a search link),
+ *  2. a real URL from Google Search grounding sources matching the tool
+ *     name (these are the pages Gemini actually consulted),
+ *  3. our own directory (DB, then static list),
+ *  4. a Google search for the tool's official site (last resort).
  */
-async function resolveToolUrl(name: string, rawUrl: unknown): Promise<string> {
-  const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
-  if (/^https?:\/\//i.test(url)) return url;
+async function resolveToolUrl(
+  name: string,
+  rawUrl: unknown,
+  webChunks: WebChunk[]
+): Promise<string> {
+  const raw = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+  if (/^https?:\/\//i.test(raw) && !/google\.[a-z.]+\/search/i.test(raw)) return raw;
+
+  const lowerName = name.toLowerCase();
+  const grounded = webChunks.find((c) => {
+    const title = (c.title ?? '').toLowerCase();
+    const uri = (c.uri ?? '').toLowerCase();
+    return (
+      title.includes(lowerName) &&
+      /^https?:\/\//.test(uri) &&
+      !/google\.[a-z.]+\/search|youtube\.com\/results/i.test(uri)
+    );
+  });
+  if (grounded?.uri) return grounded.uri;
+
   const known =
     (await getToolByName(name)) ??
-    aiDatabase.find((x) => x.name.toLowerCase() === name.toLowerCase());
-  return (
-    known?.url ??
-    `https://www.google.com/search?q=${encodeURIComponent(name + ' AI tool official website')}`
-  );
+    aiDatabase.find((x) => x.name.toLowerCase() === lowerName);
+  if (known?.url) return known.url;
+
+  return `https://www.google.com/search?q=${encodeURIComponent(name + ' AI tool official website')}`;
 }
 
 async function getGeminiRecommendations(
@@ -498,12 +518,8 @@ Base pricing and descriptions on what the tool currently offers as of your lates
 
   let lastError: unknown = null;
 
-  const reachable = await getAvailableModels(apiKey);
-  const candidates = [
-    ...GEMINI_MODELS.filter((m) => reachable.includes(m)),
-    ...reachable.filter((m) => !GEMINI_MODELS.includes(m)),
-  ];
-  const models = candidates.length > 0 ? candidates : GEMINI_MODELS;
+  const models = GEMINI_MODELS;
+
 
   for (let attempt = 0; attempt < models.length; attempt++) {
     const model = models[(geminiModelIndex + attempt) % models.length];
@@ -532,6 +548,12 @@ Base pricing and descriptions on what the tool currently offers as of your lates
       geminiFailures = 0;
 
       const data = await res.json();
+      // Google Search grounding: collect the real URLs Gemini used.
+      const webChunks: WebChunk[] =
+        data?.candidates?.[0]?.groundingMetadata?.groundingChunks
+          ?.map((c: { web?: WebChunk }) => c.web)
+          .filter(Boolean) ?? [];
+
       const reply: string =
         data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('') || '';
 
@@ -564,7 +586,7 @@ Base pricing and descriptions on what the tool currently offers as of your lates
           strengths: Array.isArray(t.strengths)
             ? t.strengths.filter((x): x is string => typeof x === 'string').slice(0, 5)
             : [],
-          url: await resolveToolUrl(name, t.url),
+          url: await resolveToolUrl(name, t.url, webChunks),
         });
       }
 

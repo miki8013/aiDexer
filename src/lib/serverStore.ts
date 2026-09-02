@@ -13,7 +13,13 @@ import { dbEnabled, query } from "./db";
 
 const DATA_DIR = process.env.AIDEXER_DATA_DIR ?? path.join(process.cwd(), ".data");
 
+/**
+ * File-backed fallback — ONLY used when DATABASE_URL is absent (local dev
+ * without a database). When Postgres is configured these are never called, so
+ * the serverless read-only filesystem is never touched in production.
+ */
 async function readJson<T>(file: string, fallback: T): Promise<T> {
+  if (dbEnabled) return fallback;
   try {
     const raw = await fs.readFile(path.join(DATA_DIR, file), "utf8");
     return JSON.parse(raw) as T;
@@ -23,6 +29,7 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
 }
 
 async function writeJson(file: string, data: unknown): Promise<boolean> {
+  if (dbEnabled) return false;
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(path.join(DATA_DIR, file), JSON.stringify(data, null, 2), "utf8");

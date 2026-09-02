@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { slugify } from "@/lib/tools";
 import { useBookmarks } from "@/lib/hooks";
@@ -17,7 +17,9 @@ export default function ToolCardExtras({ toolName }: { toolName: string }) {
   const { bookmarks, toggle } = useBookmarks();
   const [count, setCount] = useState<number | null>(voteCache.get(toolName) ?? null);
   const [voted, setVoted] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Tracks the latest optimistic tap so stale server responses can't undo a
+  // newer click (and lets rapid toggling work with zero perceived latency).
+  const voteSeq = useRef(0);
 
   useEffect(() => {
     let alive = true;
@@ -40,28 +42,49 @@ export default function ToolCardExtras({ toolName }: { toolName: string }) {
   }, [toolName]);
 
   const handleVote = async () => {
-    if (busy) return;
-    setBusy(true);
-    const action = voted ? "unuse" : "use";
+    // Optimistic UI (Instagram-style): flip instantly, reconcile in background.
+    const nextVoted = !voted;
+    setVoted(nextVoted);
+    setCount((c) => (c === null ? c : Math.max(0, c + (nextVoted ? 1 : -1))));
+    try {
+      if (nextVoted) localStorage.setItem(`aidexer:voted:${toolName}`, "1");
+      else localStorage.removeItem(`aidexer:voted:${toolName}`);
+    } catch {}
+
+    const mySeq = ++voteSeq.current;
     try {
       const res = await fetch("/api/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tool: toolName, action }),
+        body: JSON.stringify({ tool: toolName, action: nextVoted ? "use" : "unuse" }),
       });
       if (res.ok) {
         const d = await res.json();
-        voteCache.set(toolName, d.count);
-        setCount(d.count);
-        // Trust the server's answer so the state can never drift.
-        setVoted(!!d.voted);
-        try {
-          if (d.voted) localStorage.setItem(`aidexer:voted:${toolName}`, "1");
-          else localStorage.removeItem(`aidexer:voted:${toolName}`);
-        } catch {}
+        // Only apply the server's truth if the user hasn't tapped again since
+        // this request was issued — otherwise a slow response could undo a
+        // newer tap.
+        if (voteSeq.current === mySeq) {
+          voteCache.set(toolName, d.count);
+          setCount(d.count);
+          setVoted(!!d.voted);
+          try {
+            if (d.voted) localStorage.setItem(`aidexer:voted:${toolName}`, "1");
+            else localStorage.removeItem(`aidexer:voted:${toolName}`);
+          } catch {}
+        }
+      } else {
+        // Request failed — revert the optimistic flip so the UI stays honest.
+        if (voteSeq.current === mySeq) {
+          setVoted(!nextVoted);
+          setCount((c) => (c === null ? c : Math.max(0, c + (nextVoted ? -1 : 1))));
+        }
       }
-    } catch {}
-    setBusy(false);
+    } catch {
+      if (voteSeq.current === mySeq) {
+        setVoted(!nextVoted);
+        setCount((c) => (c === null ? c : Math.max(0, c + (nextVoted ? -1 : 1))));
+      }
+    }
   };
 
   const bookmarked = bookmarks.includes(toolName);
@@ -71,7 +94,6 @@ export default function ToolCardExtras({ toolName }: { toolName: string }) {
       <button
         type="button"
         onClick={handleVote}
-        disabled={busy}
         aria-pressed={voted}
         aria-label={voted ? `Retract "I use ${toolName}"` : `I use ${toolName}`}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${

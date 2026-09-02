@@ -29,10 +29,11 @@ export function getPool(): Pool {
 
 export const dbEnabled = !!process.env.DATABASE_URL;
 
-/** Run a query against Postgres. Throws if the DB is not configured. */
+/** Run a query against Postgres. Returns the result rows. Throws if the DB is not configured. */
 export async function query<T extends Record<string, unknown>>(
   text: string,
   params?: unknown[]
 ): Promise<T[]> {
-  return getPool().query(text, params) as unknown as Promise<T[]>;
+  const result = await getPool().query(text, params);
+  return result.rows as T[];
 }

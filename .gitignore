@@ -41,3 +41,6 @@ check-*.png
 check-*.cjs
 shot-*.png
 build-log.txt
+
+.data/
+*.log

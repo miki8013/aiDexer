@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import GridCanvas from "./GridCanvas";
 import SiteNav from "./SiteNav";
+import { useProfile } from "@/lib/hooks";
 
 // Maximum length of the user's search query. Kept aligned with the server-side
 // limit in api/recommend/route.ts so we never send a huge blob of text.
@@ -696,6 +697,11 @@ export default function Home() {
   const [budget, setBudget] = useState<string>('any');
   // Mobile: whether the Filters panel (category + budget) is expanded in the sticky bar
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Personalization: saved profile ("I'm a solo dev") tailors AI recommendations
+  const { profile, saveProfile } = useProfile();
+  const [profileDraft, setProfileDraft] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
 
   // Restore saved theme on mount; if the user never chose, follow their OS
   useEffect(() => {
@@ -738,6 +744,7 @@ export default function Home() {
           category: selectedCategory === 'All' ? undefined : selectedCategory,
           useAi,
           budget: budget === 'any' ? null : budget,
+          profile: profile || undefined,
         }),
       });
 
@@ -997,6 +1004,73 @@ export default function Home() {
                   </div>
                 </div>
               )}
+              {/* Personal profile: saved context that tailors AI recommendations */}
+              <div className="px-4 sm:px-6 pb-3">
+                {profileOpen ? (
+                  <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3">
+                    <label htmlFor="profile-input" className="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">
+                      Your profile <span className="normal-case font-normal">— helps AI Mode tailor picks</span>
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        id="profile-input"
+                        type="text"
+                        value={profileDraft}
+                        onChange={(e) => {
+                          setProfileDraft(e.target.value.slice(0, 200));
+                          setProfileSaved(false);
+                        }}
+                        placeholder="e.g. I'm a solo dev building a SaaS side project"
+                        maxLength={200}
+                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 focus:outline-none"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            saveProfile(profileDraft);
+                            setProfileSaved(true);
+                            setProfileOpen(false);
+                          }}
+                          disabled={!profileDraft.trim()}
+                          className="px-4 py-2 text-sm font-semibold rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileOpen(false);
+                            setProfileDraft(profile);
+                          }}
+                          className="px-4 py-2 text-sm font-medium rounded-full border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-2">
+                      Saved on this device{profile ? "" : " — empty for now"}. Sign in to sync it across devices.
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileDraft(profile);
+                      setProfileOpen(true);
+                      setProfileSaved(false);
+                    }}
+                    className="text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+                  >
+                    {profile
+                      ? profileSaved
+                        ? `✓ Profile saved: “${profile.length > 48 ? profile.slice(0, 48) + "…" : profile}”`
+                        : `Profile: “${profile.length > 48 ? profile.slice(0, 48) + "…" : profile}” — edit`
+                      : "+ Add a profile so AI Mode knows who you are (optional)"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

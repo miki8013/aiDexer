@@ -402,7 +402,8 @@ function setCachedGemini(key: string, indices: number[]): void {
 async function getGeminiRecommendations(
   query: string,
   category: string | null,
-  constraints: Constraints
+  constraints: Constraints,
+  profile: string | null = null
 ): Promise<number[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return [];
@@ -411,7 +412,7 @@ async function getGeminiRecommendations(
   }
 
   // Serve repeated queries from cache — saves tokens and latency
-  const cacheKey = `${query.toLowerCase()}|${category ?? ''}|${JSON.stringify(constraints)}`;
+  const cacheKey = `${query.toLowerCase()}|${category ?? ''}|${profile ?? ''}|${JSON.stringify(constraints)}`;
   const cached = getCachedGemini(cacheKey);
   if (cached) return cached;
 
@@ -426,7 +427,7 @@ ${GEMINI_TOOL_LIST}
 
 Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,1]. No other text.`;
 
-  const userPrompt = `User query: "${query}"${category ? `\nPreferred category: ${category}` : ''}`;
+  const userPrompt = `User query: "${query}"${category ? `\nPreferred category: ${category}` : ''}${profile ? `\nUser context (who they are, tailor picks accordingly): ${profile}` : ''}`;
 
   const constraintLine = constraintsSummary(constraints);
   let lastError: unknown = null;
@@ -520,6 +521,7 @@ export async function POST(request: NextRequest) {
     const query = body.query.trim().slice(0, 500);
     const category = typeof body.category === 'string' ? body.category.trim().slice(0, 100) : null;
     const useAi = body.useAi === true;
+    const profile = typeof body.profile === 'string' ? body.profile.trim().slice(0, 200) : null;
 
     if (!query) {
       return NextResponse.json(
@@ -548,7 +550,7 @@ export async function POST(request: NextRequest) {
     // --- AI mode: use Gemini when the toggle is on, free scoring as fallback ---
     if (useAi && process.env.GEMINI_API_KEY) {
       try {
-        const geminiIndices = await getGeminiRecommendations(query, category, constraints);
+        const geminiIndices = await getGeminiRecommendations(query, category, constraints, profile);
         if (geminiIndices.length > 0) {
           const recommendations = geminiIndices
             .map((i) => aiDatabase[i - 1])

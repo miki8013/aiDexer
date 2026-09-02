@@ -310,3 +310,34 @@ export async function saveProfile(userId: string, profile: string): Promise<bool
   }
 }
 
+/** Tools this user has voted for ("I use this"), by name. */
+export async function getVotedTools(userId: string): Promise<string[]> {
+  if (!dbEnabled) return [];
+  try {
+    const rows = await query<{ tool: string }>(
+      "SELECT tool FROM vote_events WHERE voter = $1 ORDER BY created_at ASC",
+      [`user:${userId}`]
+    );
+    return rows.map((r) => r.tool);
+  } catch (err) {
+    console.error("getVotedTools db error:", err);
+    return [];
+  }
+}
+
+/** Everything we know about a user's preferences, used to personalize recommendations. */
+export interface UserSignals {
+  profile: string;
+  bookmarks: string[];
+  votes: string[];
+}
+
+export async function getUserSignals(userId: string): Promise<UserSignals> {
+  const [profile, bookmarks, votes] = await Promise.all([
+    getProfile(userId),
+    getBookmarks(userId),
+    getVotedTools(userId),
+  ]);
+  return { profile, bookmarks, votes };
+}
+

@@ -105,3 +105,20 @@ CREATE TABLE IF NOT EXISTS profiles (
   profile TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------
+-- AI tools directory — the single source of truth for tool data.
+-- Seeded from src/app/api/recommend/aiDatabase.ts via `npm run db:seed`.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tools (
+  slug TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  category TEXT NOT NULL,
+  strengths TEXT[] NOT NULL DEFAULT '{}',
+  best_for TEXT[] NOT NULL DEFAULT '{}',
+  pricing TEXT NOT NULL DEFAULT '',
+  access TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_tools_category ON tools (category);

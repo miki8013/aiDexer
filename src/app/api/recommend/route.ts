@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { aiDatabase } from './aiDatabase';
+import { aiDatabase, type AIModel } from './aiDatabase';
+import { getAllTools } from '@/lib/toolsDb';
+import { getUserSignals, type UserSignals } from '@/lib/serverStore';
 
 // Security headers for all responses
 const securityHeaders = {
@@ -274,21 +276,36 @@ function matchesWord(token: string, text: string): boolean {
 }
 
 // Pre-split searchable text per tool so we don't rebuild it on every request
-const toolSearchIndex = aiDatabase.map((tool) => {
-  const name = tool.name.toLowerCase();
-  const category = tool.category.toLowerCase();
-  const strengths = tool.strengths.join(' ').toLowerCase();
-  const bestFor = tool.bestFor.join(' ').toLowerCase();
-  const description = tool.description.toLowerCase();
-  return {
-    tool,
-    name,
-    category,
-    strengths,
-    bestFor,
-    description,
-  };
-});
+interface SearchEntry {
+  tool: AIModel;
+  name: string;
+  category: string;
+  strengths: string;
+  bestFor: string;
+  description: string;
+}
+
+/** Build a search index over a tool list (works for static or DB-loaded tools). */
+function buildSearchIndex(tools: AIModel[]): SearchEntry[] {
+  return tools.map((tool) => {
+    const name = tool.name.toLowerCase();
+    const category = tool.category.toLowerCase();
+    const strengths = tool.strengths.join(' ').toLowerCase();
+    const bestFor = tool.bestFor.join(' ').toLowerCase();
+    const description = tool.description.toLowerCase();
+    return {
+      tool,
+      name,
+      category,
+      strengths,
+      bestFor,
+      description,
+    };
+  });
+}
+
+/** Static fallback index (used when the DB is unavailable). */
+const toolSearchIndex = buildSearchIndex(aiDatabase);
 
 /**
  * Free, instant keyword-scoring recommendation engine.
@@ -296,7 +313,7 @@ const toolSearchIndex = aiDatabase.map((tool) => {
  * category, strengths, bestFor and description. Handles typos
  * ("imgae" -> image). No external API calls, no API keys, no cost.
  */
-function scoreTool(queryTokens: string[], category: string | null, entry: (typeof toolSearchIndex)[number]): number {
+function scoreTool(queryTokens: string[], category: string | null, entry: SearchEntry): number {
   let score = 0;
 
   for (const token of queryTokens) {
@@ -320,6 +337,34 @@ function scoreTool(queryTokens: string[], category: string | null, entry: (typeo
   if (/free/i.test(entry.tool.pricing)) score += 1;
 
   return score;
+}
+
+/**
+ * Personalization boost so recommendations adapt to the signed-in user:
+ *  - tools they've bookmarked or voted for get a big lift,
+ *  - tools in categories they already like get a lift,
+ *  - tools matching keywords in their saved profile get a lift.
+ */
+function personalizationBoost(
+  entry: SearchEntry,
+  signals: UserSignals | null,
+  likedCategories: Set<string>
+): number {
+  if (!signals) return 0;
+  let boost = 0;
+  const liked = new Set([...signals.bookmarks, ...signals.votes]);
+  if (liked.has(entry.tool.name)) boost += 25;
+  if (likedCategories.has(entry.category)) boost += 8;
+  const profileLower = signals.profile.toLowerCase();
+  if (profileLower) {
+    for (const tok of tokenize(profileLower)) {
+      if (matchesWord(tok, entry.name)) boost += 6;
+      if (matchesWord(tok, entry.category)) boost += 4;
+      if (matchesWord(tok, entry.bestFor)) boost += 3;
+      if (matchesWord(tok, entry.strengths)) boost += 2;
+    }
+  }
+  return boost;
 }
 
 // Gemini model candidates, tried in order (first available wins, cached)
@@ -395,11 +440,12 @@ function setCachedGemini(key: string, indices: number[]): void {
 }
 
 /**
- * Ask Gemini to pick the most relevant tools from the database.
- * Returns 1-based indices into aiDatabase, best match first.
+ * Ask Gemini to pick the most relevant tools from the provided list.
+ * Returns 1-based indices into the tool list, best match first.
  * Throws on failure so the caller can fall back to keyword scoring.
  */
 async function getGeminiRecommendations(
+  tools: AIModel[],
   query: string,
   category: string | null,
   constraints: Constraints,
@@ -416,8 +462,8 @@ async function getGeminiRecommendations(
   const cached = getCachedGemini(cacheKey);
   if (cached) return cached;
 
-  // Built once at module load — the tool list never changes per request
-  const GEMINI_TOOL_LIST = aiDatabase
+  // Built from the (possibly DB-loaded) tool list for this request
+  const GEMINI_TOOL_LIST = tools
     .map((tool, i) => `${i + 1}. ${tool.name} — ${tool.bestFor.slice(0, 3).join(', ')}`)
     .join('\n');
 
@@ -475,9 +521,9 @@ Respond with ONLY a JSON array of up to 8 numbers, best match first, e.g. [3,12,
       const match = reply.match(/\[[\d\s,]*\]/);
       if (!match) return [];
       const indices = (JSON.parse(match[0]) as number[])
-        .filter((n) => Number.isInteger(n) && n >= 1 && n <= aiDatabase.length)
+        .filter((n) => Number.isInteger(n) && n >= 1 && n <= tools.length)
         // Hard guard: drop any pick that breaks the user's stated budget.
-        .filter((n) => passesBudget(aiDatabase[n - 1].pricing, constraints));
+        .filter((n) => passesBudget(tools[n - 1].pricing, constraints));
       setCachedGemini(cacheKey, indices);
       return indices;
     } catch (error) {
@@ -547,14 +593,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // --- Tools: DB-first (single source of truth), fall back to static ---
+    const tools = await getAllTools();
+    const searchIndex = buildSearchIndex(tools);
+
+    // --- User matching: pull the signed-in user's profile, bookmarks, votes ---
+    let signals: UserSignals | null = null;
+    try {
+      const { auth } = await import('@/lib/auth');
+      const session = await auth.api.getSession({ headers: request.headers });
+      if (session?.user?.id) signals = await getUserSignals(session.user.id);
+    } catch {
+      // Auth/DB not configured — no personalization, still works for guests.
+    }
+    const likedNames = new Set([...(signals?.bookmarks ?? []), ...(signals?.votes ?? [])]);
+    const likedCategories = new Set(
+      tools.filter((t) => likedNames.has(t.name)).map((t) => t.category.toLowerCase())
+    );
+
     // --- AI mode: use Gemini when the toggle is on, free scoring as fallback ---
     if (useAi && process.env.GEMINI_API_KEY) {
       try {
-        const geminiIndices = await getGeminiRecommendations(query, category, constraints, profile);
+        const geminiIndices = await getGeminiRecommendations(tools, query, category, constraints, profile);
         if (geminiIndices.length > 0) {
           const recommendations = geminiIndices
-            .map((i) => aiDatabase[i - 1])
-            .filter((tool): tool is (typeof aiDatabase)[number] => tool !== undefined)
+            .map((i) => tools[i - 1])
+            .filter((tool): tool is AIModel => tool !== undefined)
             // Dedupe by name — Gemini occasionally repeats a tool
             .filter((tool, idx, arr) => arr.findIndex((t) => t.name === tool.name) === idx)
             .slice(0, 8);
@@ -581,9 +645,11 @@ export async function POST(request: NextRequest) {
     // user's stated constraints (offline/open-source, free, within budget).
     // Anything that breaks the budget is dropped, so "unrelated expensive tools"
     // never get returned for a "free or under $X" request.
-    const scored = toolSearchIndex
+    const scored = searchIndex
       .map((entry) => {
         let score = scoreTool(queryTokens, category, entry);
+        // Personalization: adapt to the signed-in user's profile/bookmarks/votes.
+        score += personalizationBoost(entry, signals, likedCategories);
         if (constraints.noApi && /open[- ]?source|self-?hosted|local|desktop|privacy|offline/i.test(
           [entry.tool.pricing, entry.tool.access, entry.tool.strengths.join(' ')].join(' ')
         )) {
@@ -604,12 +670,12 @@ export async function POST(request: NextRequest) {
     if (scored.length > 0) {
       recommendations = scored.map((entry) => entry.tool);
     } else if (constraints.freeOnly || constraints.budgetMax !== null || constraints.noApi) {
-      recommendations = aiDatabase
+      recommendations = tools
         .filter((tool) => passesBudget(tool.pricing, constraints))
         .sort((a, b) => Number(parseToolPrice(b.pricing).hasFree) - Number(parseToolPrice(a.pricing).hasFree))
         .slice(0, 8);
     } else {
-      recommendations = aiDatabase.filter((tool) => tool.category === 'General Purpose').slice(0, 5);
+      recommendations = tools.filter((tool) => tool.category === 'General Purpose').slice(0, 5);
     }
 
     return NextResponse.json(
